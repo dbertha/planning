@@ -101,14 +101,29 @@ export function usePlanningData(token) {
       });
 
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          // Token admin expiré, passer en mode public
-          setAuthToken(null);
-          localStorage.removeItem('adminSessionToken');
-          // Relancer sans token admin
-          return loadPlanningData();
+        let errorBody = null;
+        try {
+          errorBody = await response.json();
+        } catch (_) {
+          // ignore json parse error
         }
-        throw new Error(`Erreur HTTP: ${response.status}`);
+        const message = errorBody?.error || `Erreur HTTP: ${response.status}`;
+
+        if (response.status === 401 || response.status === 403) {
+          const lower = message.toLowerCase();
+          const isInvalidToken = lower.includes('token invalide') || lower.includes('token manquant') || lower.includes('planning inactif');
+          if (isInvalidToken) {
+            throw new Error(message);
+          }
+          // Session admin expirée: on repasse en mode public uniquement si un token admin était présent
+          if (authToken) {
+            setAuthToken(null);
+            localStorage.removeItem('adminSessionToken');
+            return loadPlanningData();
+          }
+          throw new Error(message);
+        }
+        throw new Error(message);
       }
 
       const result = await response.json();
