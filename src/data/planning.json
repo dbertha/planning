@@ -1,0 +1,755 @@
+{
+  "classes": [
+    {
+      "id": "A",
+      "nom": "Partie A - Rez Canard Stéphanie",
+      "couleur": "#ffcccb"
+    },
+    {
+      "id": "B",
+      "nom": "Partie B - Chat Eglantine + Cuisine",
+      "couleur": "#ffd700"
+    },
+    {
+      "id": "C",
+      "nom": "Partie C - 1er étage Coq/Poule + local",
+      "couleur": "#90ee90"
+    },
+    {
+      "id": "D",
+      "nom": "Partie D - 1er étage Hirondelle (P3)",
+      "couleur": "#ff6961"
+    },
+    {
+      "id": "E",
+      "nom": "Partie E - Rez Papillon (P1) / Vache",
+      "couleur": "#87ceeb"
+    }
+  ],
+  "semaines": [
+    {
+      "id": "2024-01-11",
+      "debut": "2024-01-11",
+      "fin": "2024-01-12",
+      "type": "WE"
+    },
+    {
+      "id": "2024-01-18",
+      "debut": "2024-01-18",
+      "fin": "2024-01-19",
+      "type": "WE"
+    },
+    {
+      "id": "2024-01-25",
+      "debut": "2024-01-25",
+      "fin": "2024-01-26",
+      "type": "WE"
+    },
+    {
+      "id": "2024-02-01",
+      "debut": "2024-02-01",
+      "fin": "2024-02-02",
+      "type": "WE"
+    },
+    {
+      "id": "2024-02-08",
+      "debut": "2024-02-08",
+      "fin": "2024-02-09",
+      "type": "WE"
+    },
+    {
+      "id": "2024-02-22",
+      "debut": "2024-02-22",
+      "fin": "2024-03-09",
+      "type": "SPECIAL",
+      "description": "du S 22/02 au D 19/03"
+    },
+    {
+      "id": "2024-03-15",
+      "debut": "2024-03-15",
+      "fin": "2024-03-16",
+      "type": "WE"
+    },
+    {
+      "id": "2024-03-22",
+      "debut": "2024-03-22",
+      "fin": "2024-03-23",
+      "type": "WE"
+    },
+    {
+      "id": "2024-03-29",
+      "debut": "2024-03-29",
+      "fin": "2024-03-30",
+      "type": "WE"
+    },
+    {
+      "id": "2024-04-05",
+      "debut": "2024-04-05",
+      "fin": "2024-04-06",
+      "type": "WE"
+    },
+    {
+      "id": "2024-04-12",
+      "debut": "2024-04-12",
+      "fin": "2024-04-13",
+      "type": "WE"
+    },
+    {
+      "id": "2024-04-19",
+      "debut": "2024-04-19",
+      "fin": "2024-04-20",
+      "type": "WE"
+    },
+    {
+      "id": "2024-04-26",
+      "debut": "2024-04-26",
+      "fin": "2024-05-11",
+      "type": "SPECIAL",
+      "description": "du S 26/04 au D 11/05"
+    },
+    {
+      "id": "2024-05-17",
+      "debut": "2024-05-17",
+      "fin": "2024-05-18",
+      "type": "WE"
+    },
+    {
+      "id": "2024-05-24",
+      "debut": "2024-05-24",
+      "fin": "2024-05-25",
+      "type": "WE"
+    },
+    {
+      "id": "2024-05-31",
+      "debut": "2024-05-31",
+      "fin": "2024-06-01",
+      "type": "WE"
+    },
+    {
+      "id": "2024-06-07",
+      "debut": "2024-06-07",
+      "fin": "2024-06-08",
+      "type": "WE"
+    },
+    {
+      "id": "2024-06-14",
+      "debut": "2024-06-14",
+      "fin": "2024-06-15",
+      "type": "WE"
+    },
+    {
+      "id": "2024-06-21",
+      "debut": "2024-06-21",
+      "fin": "2024-06-22",
+      "type": "WE"
+    },
+    {
+      "id": "2024-06-28",
+      "debut": "2024-06-28",
+      "fin": "2024-06-29",
+      "type": "WE"
+    }
+  ],
+  "affectations": [
+    {
+      "classeId": "A",
+      "semaineId": "2024-01-11",
+      "famille": "Scholsem Gabriel + Adèle",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-01-11",
+      "famille": "D'Agostino Rama",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-01-11",
+      "famille": "Calicis Elliot",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-01-11",
+      "famille": "Berry Bjorn",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-01-11",
+      "famille": "Berthin Camille",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-01-18",
+      "famille": "Levêque Siméon",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-01-18",
+      "famille": "Schalkwijk Noah",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-01-18",
+      "famille": "Vanderstraeten Eli",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-01-18",
+      "famille": "Hulet Lily",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-01-18",
+      "famille": "Michaux Hope + Maëlle",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-01-25",
+      "famille": "Lippert Una + Yolan",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-01-25",
+      "famille": "Gillet-Mawet Célestin + Edouard",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-01-25",
+      "famille": "Sohier Fioravanti Noé",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-01-25",
+      "famille": "Lacroix Anne",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-01-25",
+      "famille": "Posillon Callie + Cléo",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-02-01",
+      "famille": "Goetghebuer Thalie",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-02-01",
+      "famille": "Pochet Charli",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-02-01",
+      "famille": "Vertongen Joachim + Jacob",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-02-01",
+      "famille": "Mambourg Elora",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-02-01",
+      "famille": "Venken + Samuel + Manoël",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-02-08",
+      "famille": "Brennet Lassart Jade",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-02-08",
+      "famille": "Perez Barreto Myrtille + Luz",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-02-08",
+      "famille": "Marchette Bastien + Hector + Gabin",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-02-08",
+      "famille": "De Troostenbergh Félicien",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-02-08",
+      "famille": "Duix Chloé",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-02-22",
+      "famille": "Laffut Juliette",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-02-22",
+      "famille": "Larbalestrier Judith",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-02-22",
+      "famille": "Leroy Maxence + Romane + Eléonore",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-02-22",
+      "famille": "Malet Oscar",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-02-22",
+      "famille": "Pierreux Finarelli Emile + Lucie",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-03-15",
+      "famille": "Chavée Cottem Sohan",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-03-15",
+      "famille": "Pierreux Finarelli Emile + Lucie",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-03-15",
+      "famille": "Quirynen Adèle",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-03-15",
+      "famille": "Willemme Tom + Zoé",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-03-15",
+      "famille": "Aldorfer Olaf + Cléo",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-03-22",
+      "famille": "Houtart Charlotte + Garance",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-03-22",
+      "famille": "Devos Olga",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-03-22",
+      "famille": "Schalkwijk Noah",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-03-22",
+      "famille": "Antoinette",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-03-22",
+      "famille": "Bleycheufft Ambre + Noah",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-03-29",
+      "famille": "Lippert Una + Yolan",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-03-29",
+      "famille": "Baimenov Damir",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-03-29",
+      "famille": "Grégoire Lavry Saül",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-03-29",
+      "famille": "Berry Bjorn",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-03-29",
+      "famille": "Mauro-Possoz Maïa + Elouann",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-04-05",
+      "famille": "Delcourt Mao",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-04-05",
+      "famille": "Lemaire Arthur + Aliénor",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-04-05",
+      "famille": "Quirynen Adèle",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-04-05",
+      "famille": "Leroy Maxence + Romane + Eléonore",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-04-05",
+      "famille": "Baudelet Agathe + Marceau",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-04-12",
+      "famille": "Scholsem Gabriel + Adèle",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-04-12",
+      "famille": "Venken + Samuel + Manoël",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-04-12",
+      "famille": "Vanderstraeten Eli",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-04-12",
+      "famille": "Delaide-Philippe Taran + Louane",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-04-12",
+      "famille": "Berthin Camille",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-04-19",
+      "famille": "Levêque Siméon",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-04-19",
+      "famille": "Belgiri Elena",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-04-19",
+      "famille": "Lebrun-Thielens Tia",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-04-19",
+      "famille": "Freunet Louison + Achille",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-04-19",
+      "famille": "Michaux Hope + Maëlle",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-04-26",
+      "famille": "Domange Julia + Robin + Susan",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-04-26",
+      "famille": "Detrixhe Victor",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-04-26",
+      "famille": "Modica Huybers Maëlys + Mickaël",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-04-26",
+      "famille": "Lefebvre Noé + Atlas",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-04-26",
+      "famille": "d'Ennetières Léo + Paulin + Coline",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-05-17",
+      "famille": "Laffut Juliette",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-05-17",
+      "famille": "Larbalestrier Judith",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-05-17",
+      "famille": "Sohier Fioravanti Noé",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-05-17",
+      "famille": "Mambourg Elora",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-05-17",
+      "famille": "Leclere Florestine + Philomène",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-05-24",
+      "famille": "Vancollie Lula",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-05-24",
+      "famille": "Pinter Luyten Yuna + Aryun",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-05-24",
+      "famille": "Perez Barreto Myrtille + Luz",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-05-24",
+      "famille": "Allard-Marlier Romané + Flore + Pablo",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-05-24",
+      "famille": "Aldorfer Olaf + Cléo",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-05-31",
+      "famille": "Goffinet Louise + Victor",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-05-31",
+      "famille": "Ernest Isidore + Anatole",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-05-31",
+      "famille": "Hulet Lily",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-05-31",
+      "famille": "Berghmans Harold + Philippine + Antoinette",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-05-31",
+      "famille": "Goetghebuer Thalie",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-06-07",
+      "famille": "Luana Ciborariu",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-06-07",
+      "famille": "Marchette Bastien + Hector + Gabin",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-06-07",
+      "famille": "Bolland Coulée Walter + Ida",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-06-07",
+      "famille": "Malet Oscar",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-06-07",
+      "famille": "Castelain Joseph et Arwen + Labar Saule",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-06-14",
+      "famille": "Ayla Chappelle Demanet",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-06-14",
+      "famille": "Nathan Hôte",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-06-14",
+      "famille": "Schalkwijk Noah",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-06-14",
+      "famille": "Delaide-Philippe Taran + Louane",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-06-14",
+      "famille": "Duix Chloé",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-06-21",
+      "famille": "Eny Vanhecke Prevoo",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-06-21",
+      "famille": "Ulysse Dupagne Lemaire",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-06-21",
+      "famille": "Isée Minon Gauthier",
+      "numeroNettoyage": 1
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-06-21",
+      "famille": "Willemme Tom + Zoé",
+      "numeroNettoyage": 2
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-06-21",
+      "famille": "Bleycheufft Ambre + Noah",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "A",
+      "semaineId": "2024-06-28",
+      "famille": "Bhanji Joséphine",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "B",
+      "semaineId": "2024-06-28",
+      "famille": "Ronzaud-Snyers Eloïse",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "C",
+      "semaineId": "2024-06-28",
+      "famille": "d'Ennetières Léo + Paulin + Coline",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "D",
+      "semaineId": "2024-06-28",
+      "famille": "Vertongen Joachim + Jacob + Pablo",
+      "numeroNettoyage": 3
+    },
+    {
+      "classeId": "E",
+      "semaineId": "2024-06-28",
+      "famille": "Cornélis Gil",
+      "numeroNettoyage": 3
+    }
+  ]
+} 

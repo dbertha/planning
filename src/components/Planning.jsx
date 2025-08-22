@@ -1,0 +1,484 @@
+import React, { useState, useEffect } from 'react';
+import { usePlanningData } from '../hooks/usePlanningData';
+import { PlanningHeader } from './PlanningHeader';
+import { PlanningGrid } from './PlanningGrid';
+import { ViewSelector } from './ViewSelector';
+import AdminPanel from './AdminPanel';
+
+export function Planning() {
+  // Extraire le token depuis l'URL
+  const [token, setToken] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('token') || '';
+  });
+
+  const { 
+    data, 
+    loading, 
+    error,
+    isAdmin,
+    canEdit,
+    loginAdmin,
+    logoutAdmin,
+    refreshData,
+    createAffectation,
+    deleteAffectation,
+    toggleSemainePublication
+  } = usePlanningData(token);
+
+  const [filters, setFilters] = useState({
+    search: ''
+  });
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [tokenInput, setTokenInput] = useState(token);
+
+  // Gestion du responsive
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Mettre à jour l'URL quand le token change
+  useEffect(() => {
+    if (token) {
+      const url = new URL(window.location);
+      url.searchParams.set('token', token);
+      window.history.replaceState({}, '', url);
+    }
+  }, [token]);
+
+  const handleTokenSubmit = (e) => {
+    e.preventDefault();
+    if (tokenInput.trim()) {
+      setToken(tokenInput.trim());
+    }
+  };
+
+  // Affichage du formulaire de token si pas de token
+  if (!token) {
+    return (
+      <div className="token-form">
+        <div className="token-container">
+          <h1>🔒 Accès au Planning</h1>
+          <p>Entrez le token d'accès pour voir le planning :</p>
+          
+          <form onSubmit={handleTokenSubmit}>
+            <div className="input-group">
+              <input
+                type="text"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                placeholder="Token d'accès (ex: abc123...)"
+                required
+              />
+              <button type="submit">
+                🔍 Accéder
+              </button>
+            </div>
+          </form>
+
+          <div className="help-text">
+            <p>💡 Si vous êtes administrateur d'un planning, vous avez reçu un lien direct avec le token.</p>
+            <p>📞 Contactez l'administrateur si vous n'avez pas accès.</p>
+          </div>
+        </div>
+
+        <style jsx>{`
+          .token-form {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+          }
+
+          .token-container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+          }
+
+          .token-container h1 {
+            margin: 0 0 16px 0;
+            color: #333;
+          }
+
+          .token-container p {
+            margin: 0 0 24px 0;
+            color: #666;
+          }
+
+          .input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+          }
+
+          .input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+          }
+
+          .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+          }
+
+          .input-group button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+          }
+
+          .input-group button:hover {
+            background: #5a6fd8;
+          }
+
+          .help-text {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: left;
+          }
+
+          .help-text p {
+            margin: 8px 0;
+            font-size: 14px;
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  if (loading) return (
+    <div className="loading-container">
+      <div className="spinner"></div>
+      <p>Chargement du planning...</p>
+      <style jsx>{`
+        .loading-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 50vh;
+          gap: 16px;
+        }
+        
+        .spinner {
+          width: 40px;
+          height: 40px;
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #3498db;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+
+  if (error) return (
+    <div className="error-container">
+      <h2>❌ Erreur d'accès</h2>
+      <p>{error}</p>
+      <button onClick={() => setToken('')} className="retry-btn">
+        🔄 Essayer un autre token
+      </button>
+      <style jsx>{`
+        .error-container {
+          text-align: center;
+          padding: 40px;
+          color: #721c24;
+          background: #f8d7da;
+          border-radius: 8px;
+          margin: 20px;
+        }
+        
+        .retry-btn {
+          margin-top: 16px;
+          padding: 8px 16px;
+          background: #dc3545;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+      `}</style>
+    </div>
+  );
+
+  return (
+    <div className="planning">
+      {/* Header avec informations du planning */}
+      <div className="planning-header">
+        <div className="planning-info">
+          <h1>{data.planning?.name || 'Planning de Nettoyage'}</h1>
+          {data.planning?.description && (
+            <p className="planning-description">{data.planning.description}</p>
+          )}
+          {data.planning?.year && (
+            <span className="planning-year">Année {data.planning.year}</span>
+          )}
+        </div>
+
+        <div className="planning-controls">
+          {/* Indicateur de permissions */}
+          <div className="permissions-indicator">
+            {isAdmin ? (
+              <span className="admin-badge">🔧 Administrateur</span>
+            ) : (
+              <span className="public-badge">👁️ Lecture seule</span>
+            )}
+          </div>
+
+          {/* Bouton d'administration */}
+          <button
+            onClick={() => setShowAdmin(!showAdmin)}
+            className={`admin-toggle ${showAdmin ? 'active' : ''}`}
+          >
+            {showAdmin ? '🔧 Masquer Admin' : '⚙️ Administration'}
+          </button>
+        </div>
+      </div>
+
+      {/* Interface d'administration */}
+      {showAdmin && (
+        <AdminPanel
+          token={token}
+          isAdmin={isAdmin}
+          canEdit={canEdit}
+          loginAdmin={loginAdmin}
+          logoutAdmin={logoutAdmin}
+          refreshData={refreshData}
+          toggleSemainePublication={toggleSemainePublication}
+        />
+      )}
+      
+      {/* Filtres et sélecteurs */}
+      <ViewSelector 
+        filters={filters}
+        onFilterChange={setFilters}
+        data={data}
+        isAdmin={isAdmin}
+      />
+
+      {/* Légende mobile */}
+      {isMobile && data.classes && data.classes.length > 0 && (
+        <div className="mobile-legend">
+          {data.classes.map(classe => (
+            <div key={classe.id} className="legend-item">
+              <div 
+                className="legend-color" 
+                style={{ backgroundColor: classe.couleur }}
+              />
+              <div className="legend-text">
+                {classe.nom}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Grille de planning */}
+      <div className="planning-container">
+        {data.classes && data.classes.length > 0 ? (
+          <>
+            <PlanningHeader classes={data.classes} />
+            <PlanningGrid 
+              data={data}
+              filters={filters}
+              isAdmin={isAdmin}
+              canEdit={canEdit}
+              onCreateAffectation={createAffectation}
+              onDeleteAffectation={deleteAffectation}
+            />
+          </>
+        ) : (
+          <div className="empty-planning">
+            <h3>📋 Planning vide</h3>
+            <p>Aucune classe ou semaine n'a été configurée pour ce planning.</p>
+            {isAdmin && (
+              <p>Utilisez l'interface d'administration pour configurer les classes et semaines.</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <style jsx>{`
+        .planning {
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+
+        .planning-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 24px;
+          padding-bottom: 16px;
+          border-bottom: 2px solid #eee;
+        }
+
+        .planning-info h1 {
+          margin: 0 0 8px 0;
+          color: #333;
+          font-size: 28px;
+        }
+
+        .planning-description {
+          margin: 0 0 8px 0;
+          color: #666;
+          font-size: 16px;
+        }
+
+        .planning-year {
+          background: #e9ecef;
+          padding: 4px 12px;
+          border-radius: 16px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #495057;
+        }
+
+        .planning-controls {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 12px;
+        }
+
+        .permissions-indicator {
+          font-size: 14px;
+        }
+
+        .admin-badge {
+          background: #d4edda;
+          color: #155724;
+          padding: 6px 12px;
+          border-radius: 16px;
+          font-weight: 500;
+        }
+
+        .public-badge {
+          background: #e2e3e5;
+          color: #495057;
+          padding: 6px 12px;
+          border-radius: 16px;
+          font-weight: 500;
+        }
+
+        .admin-toggle {
+          padding: 10px 20px;
+          border: 2px solid #007bff;
+          background: white;
+          color: #007bff;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: 500;
+          transition: all 0.2s;
+        }
+
+        .admin-toggle:hover,
+        .admin-toggle.active {
+          background: #007bff;
+          color: white;
+        }
+
+        .mobile-legend {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-bottom: 20px;
+          padding: 16px;
+          background: #f8f9fa;
+          border-radius: 8px;
+        }
+
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .legend-color {
+          width: 16px;
+          height: 16px;
+          border-radius: 4px;
+          border: 1px solid #ddd;
+        }
+
+        .legend-text {
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .planning-container {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          overflow: hidden;
+        }
+
+        .empty-planning {
+          text-align: center;
+          padding: 60px 20px;
+          color: #666;
+        }
+
+        .empty-planning h3 {
+          margin: 0 0 16px 0;
+          color: #333;
+        }
+
+        .empty-planning p {
+          margin: 8px 0;
+        }
+
+        @media (max-width: 768px) {
+          .planning {
+            padding: 12px;
+          }
+
+          .planning-header {
+            flex-direction: column;
+            gap: 16px;
+            align-items: stretch;
+          }
+
+          .planning-controls {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .planning-info h1 {
+            font-size: 24px;
+          }
+        }
+      `}</style>
+    </div>
+  );
+} 

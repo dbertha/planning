@@ -1,0 +1,39 @@
+{
+  "scripts": {
+    "dev": "vite",
+    "dev:vite": "vite",
+    "dev:api": "node dev-server.js",
+    "dev:api:logs": "node dev-server.js | tee api-logs.txt",
+    "dev:vercel": "vercel dev --listen 3000",
+    "dev:proxy": "npm run dev:vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node tests/run-all-tests.js",
+    "test:api": "node tests/run-all-tests.js --api-only",
+    "test:components": "node tests/run-all-tests.js --components-only",
+    "test:help": "node tests/run-all-tests.js --help"
+  },
+  "name": "planning",
+  "version": "1.0.0", 
+  "type": "module",
+  "description": "",
+  "main": "vite.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "pg": "^8.16.3",
+    "react": "^19.0.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "^19.0.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.11"
+  }
+}

@@ -1,0 +1,15 @@
+# Fichiers temporaires de tests
+last-test-report.json
+*.tmp
+*.log
+
+# Données de test
+test-data/
+temp/
+
+# Couverture de code
+coverage/
+.nyc_output/
+
+# Fichiers de lock temporaires
+*.lock 

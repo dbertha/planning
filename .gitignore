@@ -89,7 +89,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist - Commenté car Vercel a besoin du dossier dist pour le build
 
 # Gatsby files
 .cache/
@@ -128,3 +128,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+.vercel
+
+# Fichiers spécifiques au projet
+api-logs.txt
+dev-server.js
+*.tmp
