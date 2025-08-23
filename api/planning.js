@@ -5,8 +5,10 @@ import {
   createPlanning, 
   getAvailableFamiliesForCell, 
   isCellAvailable,
+  isFamilleAvailableForPeriod,
   validateAdminSession,
-  toggleSemainePublication
+  toggleSemainePublication,
+  autoDistributeWeek
 } from './db.js';
 
 export default async function handler(req, res) {
@@ -137,7 +139,8 @@ async function handleGet(req, res) {
                  CASE 
                    WHEN a.classe_id = ANY(f.classes_preferences) THEN 'Classe préférée'
                    ELSE 'Assignation normale'
-                 END as preference_description
+                 END as preference_description,
+                 ROW_NUMBER() OVER (PARTITION BY a.famille_id ORDER BY s.debut, c.ordre, c.id) as nettoyage_numero
           FROM affectations a
           LEFT JOIN familles f ON a.famille_id = f.id
           LEFT JOIN classes c ON a.classe_id = c.id AND a.planning_id = c.planning_id
@@ -174,7 +177,8 @@ async function handleGet(req, res) {
           semaineDescription: row.semaine_description,
           semainePublished: row.is_published,
           semainePublishedAt: row.published_at,
-          preferenceDescription: row.preference_description
+          preferenceDescription: row.preference_description,
+          numeroNettoyage: parseInt(row.nettoyage_numero) // Numéro chronologique du nettoyage
         })),
         permissions: {
           isAdmin,
@@ -306,6 +310,42 @@ async function handlePost(req, res) {
           });
         }
 
+        // Vérifier les contraintes d'exclusion de la famille
+        const semaineDetails = await query(
+          'SELECT debut, fin FROM semaines WHERE id = $1 AND planning_id = $2',
+          [data.semaineId, planning.id]
+        );
+
+        if (semaineDetails.rows.length === 0) {
+          return res.status(400).json({ error: 'Semaine introuvable' });
+        }
+
+        const { debut, fin } = semaineDetails.rows[0];
+        const familleAvailable = await isFamilleAvailableForPeriod(
+          data.familleId, 
+          debut, 
+          fin, 
+          planning.id
+        );
+
+        if (!familleAvailable) {
+          return res.status(400).json({ 
+            error: 'Cette famille n\'est pas disponible pour cette période (contrainte d\'exclusion)' 
+          });
+        }
+
+        // Vérifier que la famille n'est pas déjà affectée ailleurs cette semaine
+        const existingAffectation = await query(
+          'SELECT classe_id FROM affectations WHERE famille_id = $1 AND semaine_id = $2 AND planning_id = $3',
+          [data.familleId, data.semaineId, planning.id]
+        );
+
+        if (existingAffectation.rows.length > 0) {
+          return res.status(400).json({ 
+            error: `Cette famille est déjà affectée à la classe ${existingAffectation.rows[0].classe_id} pour cette semaine` 
+          });
+        }
+
         const affectationResult = await query(
           'INSERT INTO affectations (planning_id, famille_id, classe_id, semaine_id, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
           [planning.id, data.familleId, data.classeId, data.semaineId, data.notes]
@@ -318,6 +358,13 @@ async function handlePost(req, res) {
         const { semaineId, publish } = data;
         const updatedSemaine = await toggleSemainePublication(semaineId, planning.id, publish);
         res.status(200).json(updatedSemaine);
+        break;
+
+      case 'auto_distribute':
+        // Distribution automatique pour une semaine
+        const { semaineId: targetSemaineId } = data;
+        const distributionResult = await autoDistributeWeek(targetSemaineId, planning.id);
+        res.status(200).json(distributionResult);
         break;
 
       default:

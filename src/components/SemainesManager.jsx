@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication }) {
   const [semaines, setSemaines] = useState([]);
@@ -6,6 +7,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, semaineId: null, semaineName: null });
 
   // Formulaire pour nouvelle semaine
   const [newSemaine, setNewSemaine] = useState({
@@ -99,7 +101,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
       });
       setShowAddForm(false);
       await loadSemaines();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -111,7 +113,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
     try {
       setLoading(true);
       await toggleSemainePublication(semaineId, !currentStatus);
-      await loadSemaines();
+      // loadSemaines() supprimé car toggleSemainePublication met déjà à jour l'état
     } catch (err) {
       setError(err.message);
     } finally {
@@ -120,10 +122,17 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
   };
 
   const handleDeleteSemaine = async (semaineId) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer la semaine ${semaineId} ?`)) {
-      return;
-    }
+    const semaine = semaines.find(s => s.id === semaineId);
+    setDeleteModal({
+      isOpen: true,
+      semaineId,
+      semaineName: `${semaineId} (${semaine?.debut} - ${semaine?.fin})`
+    });
+  };
 
+  const confirmDeleteSemaine = async () => {
+    const semaineId = deleteModal.semaineId;
+    
     try {
       setLoading(true);
       const response = await fetch('/api/planning', {
@@ -145,7 +154,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
       }
 
       await loadSemaines();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -231,7 +240,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
       });
       setShowBulkForm(false);
       await loadSemaines();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -498,6 +507,18 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
           </div>
         )}
       </div>
+
+      {/* Modal de confirmation de suppression */}
+      <DeleteConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, semaineId: null, semaineName: null })}
+        onConfirm={confirmDeleteSemaine}
+        title="Supprimer la semaine"
+        message="Êtes-vous sûr de vouloir supprimer cette semaine ? Cette action est irréversible."
+        itemName={deleteModal.semaineName}
+        confirmText="Supprimer la semaine"
+        cancelText="Annuler"
+      />
 
       <style jsx>{`
         .semaines-manager {

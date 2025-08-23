@@ -3,6 +3,7 @@ import { usePlanningData } from '../hooks/usePlanningData';
 import { PlanningHeader } from './PlanningHeader';
 import { PlanningGrid } from './PlanningGrid';
 import { ViewSelector } from './ViewSelector';
+import { FamiliesSidebar } from './FamiliesSidebar';
 import AdminPanel from './AdminPanel';
 
 export function Planning() {
@@ -23,7 +24,8 @@ export function Planning() {
     refreshData,
     createAffectation,
     deleteAffectation,
-    toggleSemainePublication
+    toggleSemainePublication,
+    autoDistributeWeek
   } = usePlanningData(token);
 
   const [filters, setFilters] = useState({
@@ -301,29 +303,59 @@ export function Planning() {
         </div>
       )}
 
-      {/* Grille de planning */}
-      <div className="planning-container">
-        {data.classes && data.classes.length > 0 ? (
-          <>
-            <PlanningHeader classes={data.classes} />
-            <PlanningGrid 
-              data={data}
-              filters={filters}
-              isAdmin={isAdmin}
-              canEdit={canEdit}
-              onCreateAffectation={createAffectation}
-              onDeleteAffectation={deleteAffectation}
-            />
-          </>
-        ) : (
-          <div className="empty-planning">
-            <h3>📋 Planning vide</h3>
-            <p>Aucune classe ou semaine n'a été configurée pour ce planning.</p>
-            {isAdmin && (
-              <p>Utilisez l'interface d'administration pour configurer les classes et semaines.</p>
-            )}
-          </div>
+      {/* Layout principal avec sidebar et planning */}
+      <div className="main-layout">
+        {/* Sidebar des familles (visible si des familles existent) */}
+        {data.familles && data.familles.length > 0 && (
+          <FamiliesSidebar
+            familles={data.familles}
+            isAdmin={isAdmin}
+            filters={filters}
+            onFilterChange={setFilters}
+          />
         )}
+
+        {/* Grille de planning */}
+        <div className="planning-container">
+          {data.classes && data.classes.length > 0 ? (
+            <>
+              {/* Indicateur de classes */}
+              <div className="classes-indicator">
+                <span className="classes-count">
+                  🏠 {data.classes.length} classe{data.classes.length > 1 ? 's' : ''}
+                </span>
+                {data.classes.length > 5 && (
+                  <span className="scroll-hint">
+                    ↔️ Faites défiler horizontalement
+                  </span>
+                )}
+              </div>
+
+              <div className="planning-scroll-container">
+                <div className="planning-grid-wrapper">
+                  <PlanningHeader classes={data.classes} />
+                  <PlanningGrid 
+                    data={data}
+                    filters={filters}
+                    isAdmin={isAdmin}
+                    canEdit={canEdit}
+                    onCreateAffectation={createAffectation}
+                    onDeleteAffectation={deleteAffectation}
+                    onAutoDistribute={autoDistributeWeek}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-planning">
+              <h3>📋 Planning vide</h3>
+              <p>Aucune classe ou semaine n'a été configurée pour ce planning.</p>
+              {isAdmin && (
+                <p>Utilisez l'interface d'administration pour configurer les classes et semaines.</p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <style jsx>{`
@@ -435,11 +467,133 @@ export function Planning() {
           font-weight: 500;
         }
 
+        .main-layout {
+          display: flex;
+          gap: 0;
+          min-height: 60vh;
+        }
+
         .planning-container {
+          flex: 1;
           background: white;
           border-radius: 8px;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .classes-indicator {
+          background: #f8f9fa;
+          padding: 8px 16px;
+          border-bottom: 1px solid #dee2e6;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12px;
+        }
+
+        .classes-count {
+          color: #495057;
+          font-weight: 600;
+        }
+
+        .scroll-hint {
+          color: #007bff;
+          font-style: italic;
+        }
+
+        .planning-scroll-container {
+          flex: 1;
+          overflow-x: auto;
+          overflow-y: visible;
+          min-width: 0; /* Important pour le flexbox */
+          scrollbar-width: thin;
+          scrollbar-color: #007bff #f1f1f1;
+        }
+
+        .planning-scroll-container::-webkit-scrollbar {
+          height: 8px;
+        }
+
+        .planning-scroll-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        .planning-scroll-container::-webkit-scrollbar-thumb {
+          background: #007bff;
+          border-radius: 4px;
+        }
+
+        .planning-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: #0056b3;
+        }
+
+        .planning-grid-wrapper {
+          min-width: ${data.classes?.length ? data.classes.length * 150 + 180 : 800}px;
+          width: 100%;
+        }
+
+        @media (max-width: 768px) {
+          .main-layout {
+            flex-direction: column;
+          }
+
+          .planning {
+            padding: 12px;
+            max-width: 100vw;
+            overflow-x: hidden;
+          }
+
+          .planning-container {
+            border-radius: 4px;
+          }
+
+          .planning-scroll-container {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .planning-grid-wrapper {
+            min-width: ${data.classes?.length ? data.classes.length * 120 + 120 : 600}px;
+          }
+
+          .classes-indicator {
+            padding: 6px 12px;
+            font-size: 11px;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .planning {
+            padding: 8px;
+          }
+
+          .planning-header {
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+          }
+
+          .planning-controls {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .planning-info h1 {
+            font-size: 20px;
+          }
+
+          .planning-grid-wrapper {
+            min-width: ${data.classes?.length ? data.classes.length * 100 + 100 : 500}px;
+          }
+
+          .scroll-hint {
+            display: block;
+          }
         }
 
         .empty-planning {

@@ -341,6 +341,12 @@ Exemples:
       file: 'api.test.js',
       description: 'Tests des APIs REST (auth, planning, familles)'
     });
+    
+    testSuites.push({
+      name: 'Tests Exclusions',
+      file: 'exclusions.test.js',
+      description: 'Tests des contraintes d\'exclusion des familles'
+    });
   }
   
   if (!options.apiOnly) {
@@ -348,6 +354,12 @@ Exemples:
       name: 'Tests Composants',
       file: 'components.test.js',
       description: 'Tests de la logique des composants React'
+    });
+
+    testSuites.push({
+      name: 'Tests Distribution Auto',
+      file: 'auto-distribution.test.js',
+      description: 'Tests de la distribution automatique des nettoyages'
     });
   }
 

@@ -87,8 +87,8 @@ function assertEqual(actual, expected, message) {
 let testPlanningToken = null;
 let testAdminSession = null;
 let testFamilleId = null;
-let testClasseId = 'TEST_A';
-let testSemaineId = '2024-01-15';
+let testClasseId = `T${Date.now().toString().slice(-8)}`;  // T + 8 derniers chiffres = 9 chars
+let testSemaineId = `S${Date.now().toString().slice(-8)}`;  // S + 8 derniers chiffres = 9 chars
 
 // Tests principaux
 async function runTests() {
@@ -176,8 +176,8 @@ async function runTests() {
         type: 'semaine',
         data: {
           id: testSemaineId,
-          debut: '2024-01-15',
-          fin: '2024-01-21',
+          debut: '2024-02-01',
+          fin: '2024-02-07',
           type: 'nettoyage',
           description: 'Semaine de test',
           is_published: false

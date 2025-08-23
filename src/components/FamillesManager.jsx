@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ExclusionsManager from './ExclusionsManager.jsx';
 
 function FamillesManager({ token, canEdit, refreshData }) {
   const [familles, setFamilles] = useState([]);
@@ -8,6 +9,7 @@ function FamillesManager({ token, canEdit, refreshData }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importResult, setImportResult] = useState(null);
+  const [selectedFamilleForExclusions, setSelectedFamilleForExclusions] = useState(null);
 
   // Formulaire pour nouvelle famille
   const [newFamille, setNewFamille] = useState({
@@ -93,7 +95,7 @@ function FamillesManager({ token, canEdit, refreshData }) {
       });
       setShowAddForm(false);
       await loadFamilles();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -156,7 +158,7 @@ function FamillesManager({ token, canEdit, refreshData }) {
       setImportResult(result);
       setImportFile(null);
       await loadFamilles();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -199,6 +201,71 @@ function FamillesManager({ token, canEdit, refreshData }) {
       preferences.push(classeId);
     }
     setNewFamille({ ...newFamille, classes_preferences: preferences });
+  };
+
+  const handleArchiveFamille = async (familleId) => {
+    const famille = familles.find(f => f.id === familleId);
+    if (!confirm(`Archiver la famille "${famille?.nom}" ?\n\nLes affectations existantes seront conservées mais la famille ne pourra plus être assignée à de nouvelles tâches.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/familles', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          id: familleId,
+          data: { is_active: false }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de l\'archivage');
+      }
+
+      await loadFamilles();
+      // refreshData() supprimé pour éviter le rechargement complet
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestoreFamille = async (familleId) => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/familles', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          id: familleId,
+          data: { is_active: true }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la restauration');
+      }
+
+      await loadFamilles();
+      // refreshData() supprimé pour éviter le rechargement complet
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -357,8 +424,37 @@ function FamillesManager({ token, canEdit, refreshData }) {
         ) : (
           <div className="families-grid">
             {familles.map(famille => (
-              <div key={famille.id} className="famille-card">
-                <h5>{famille.nom}</h5>
+              <div key={famille.id} className={`famille-card ${!famille.is_active ? 'archived' : ''}`}>
+                <div className="famille-header">
+                  <h5>{famille.nom}</h5>
+                  <div className="famille-actions">
+                    <button
+                      onClick={() => setSelectedFamilleForExclusions(famille)}
+                      className="exclusions-btn"
+                      title="Gérer les contraintes (dates d'indisponibilité)"
+                    >
+                      🚫
+                    </button>
+                    {famille.is_active ? (
+                      <button
+                        onClick={() => handleArchiveFamille(famille.id)}
+                        className="archive-btn"
+                        title="Archiver (conserve les affectations)"
+                      >
+                        📦
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleRestoreFamille(famille.id)}
+                        className="restore-btn"
+                        title="Restaurer"
+                      >
+                        ↩️
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
                 <div className="famille-info">
                   <span>📞 {famille.telephone}</span>
                   {famille.email && <span>📧 {famille.email}</span>}
@@ -375,11 +471,29 @@ function FamillesManager({ token, canEdit, refreshData }) {
                     <strong>Notes:</strong> {famille.notes}
                   </div>
                 )}
+                {!famille.is_active && (
+                  <div className="archived-badge">
+                    📦 Famille archivée
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Modal de gestion des exclusions */}
+      {selectedFamilleForExclusions && (
+        <>
+          <div className="modal-overlay" onClick={() => setSelectedFamilleForExclusions(null)} />
+          <ExclusionsManager
+            familleId={selectedFamilleForExclusions.id}
+            familleName={selectedFamilleForExclusions.nom}
+            planningToken={token}
+            onClose={() => setSelectedFamilleForExclusions(null)}
+          />
+        </>
+      )}
 
       <style jsx>{`
         .familles-manager {
@@ -534,6 +648,67 @@ function FamillesManager({ token, canEdit, refreshData }) {
           border: 1px solid #ddd;
           border-radius: 6px;
           padding: 16px;
+        }
+
+        .famille-card.archived {
+          opacity: 0.7;
+          background: #f8f9fa;
+          border-color: #adb5bd;
+        }
+
+        .famille-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 12px;
+        }
+
+        .famille-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .archive-btn, .restore-btn, .exclusions-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 16px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+
+        .archive-btn:hover {
+          background: #fff3cd;
+        }
+
+        .restore-btn:hover {
+          background: #d4edda;
+        }
+
+        .exclusions-btn:hover {
+          background: #f8d7da;
+        }
+
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 999;
+        }
+
+        .archived-badge {
+          background: #6c757d;
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 500;
+          margin-top: 8px;
+          text-align: center;
         }
 
         .famille-card h5 {

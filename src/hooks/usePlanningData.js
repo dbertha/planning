@@ -181,9 +181,36 @@ export function usePlanningData(token) {
         throw new Error(error.error || 'Erreur lors de la création');
       }
 
-      // Recharger les données
-      await loadPlanningData();
-      return await response.json();
+      const newAffectation = await response.json();
+      
+      // Calculer le numéro de nettoyage pour cette famille
+      const familleAffectations = data.affectations.filter(a => a.familleId === familleId);
+      const semaine = data.semaines.find(s => s.id === semaineId);
+      
+      // Compter les affectations antérieures pour cette famille
+      const numeroNettoyage = familleAffectations.filter(a => {
+        const affSemaine = data.semaines.find(s => s.id === a.semaineId);
+        return affSemaine && new Date(affSemaine.debut) <= new Date(semaine.debut);
+      }).length + 1;
+      
+      // Mettre à jour l'état local au lieu de recharger toutes les données
+      setData(prevData => ({
+        ...prevData,
+        affectations: [...prevData.affectations, {
+          id: newAffectation.id,
+          familleId,
+          classeId,
+          semaineId,
+          notes,
+          // Enrichir avec les données locales pour éviter un rechargement
+          familleNom: prevData.familles.find(f => f.id === familleId)?.nom || 'Famille inconnue',
+          classeNom: prevData.classes.find(c => c.id === classeId)?.nom || 'Classe inconnue',
+          classeCouleur: prevData.classes.find(c => c.id === classeId)?.couleur || '#ccc',
+          numeroNettoyage
+        }]
+      }));
+      
+      return newAffectation;
     } catch (err) {
       throw err;
     }
@@ -214,8 +241,11 @@ export function usePlanningData(token) {
         throw new Error(error.error || 'Erreur lors de la suppression');
       }
 
-      // Recharger les données
-      await loadPlanningData();
+      // Mettre à jour l'état local au lieu de recharger
+      setData(prevData => ({
+        ...prevData,
+        affectations: prevData.affectations.filter(a => a.id !== affectationId)
+      }));
     } catch (err) {
       throw err;
     }
@@ -223,7 +253,7 @@ export function usePlanningData(token) {
 
   // Fonction pour publier/dépublier une semaine
   const toggleSemainePublication = async (semaineId, publish) => {
-    if (!data.permissions.canEdit) {
+    if (!data.permissions?.canEdit) {
       throw new Error('Permissions insuffisantes');
     }
 
@@ -246,9 +276,55 @@ export function usePlanningData(token) {
         throw new Error(error.error || 'Erreur lors de la publication');
       }
 
-      // Recharger les données
+      const updatedSemaine = await response.json();
+      
+      // Mettre à jour l'état local au lieu de recharger
+      setData(prevData => ({
+        ...prevData,
+        semaines: prevData.semaines.map(s => 
+          s.id === semaineId 
+            ? { ...s, is_published: publish, published_at: publish ? new Date().toISOString() : null }
+            : s
+        )
+      }));
+      
+      return updatedSemaine;
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  // Fonction pour distribution automatique d'une semaine
+  const autoDistributeWeek = async (semaineId) => {
+    if (!data.permissions?.canEdit) {
+      throw new Error('Permissions insuffisantes');
+    }
+
+    try {
+      const response = await fetch('/api/planning', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': authToken
+        },
+        body: JSON.stringify({
+          token,
+          type: 'auto_distribute',
+          data: { semaineId }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la distribution automatique');
+      }
+
+      const result = await response.json();
+      
+      // Recharger les données pour voir les nouvelles affectations
       await loadPlanningData();
-      return await response.json();
+      
+      return result;
     } catch (err) {
       throw err;
     }
@@ -281,6 +357,7 @@ export function usePlanningData(token) {
     createAffectation,
     deleteAffectation,
     toggleSemainePublication,
+    autoDistributeWeek,
     refreshData: loadPlanningData
   };
 } 

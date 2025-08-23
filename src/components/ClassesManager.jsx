@@ -12,7 +12,8 @@ function ClassesManager({ token, canEdit, refreshData }) {
     nom: '',
     couleur: '#ffcccb',
     ordre: 0,
-    description: ''
+    description: '',
+    instructions_pdf_url: ''
   });
 
   const couleursPredefinies = [
@@ -78,11 +79,12 @@ function ClassesManager({ token, canEdit, refreshData }) {
         nom: '',
         couleur: '#ffcccb',
         ordre: 0,
-        description: ''
+        description: '',
+        instructions_pdf_url: ''
       });
       setShowAddForm(false);
       await loadClasses();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -116,7 +118,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
       }
 
       await loadClasses();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -180,7 +182,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
       }
 
       await loadClasses();
-      refreshData();
+      // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
     } finally {
@@ -280,6 +282,17 @@ function ClassesManager({ token, canEdit, refreshData }) {
               />
             </div>
 
+            <div className="form-group">
+              <label>📄 Instructions PDF (URL)</label>
+              <input
+                type="url"
+                value={newClasse.instructions_pdf_url}
+                onChange={(e) => setNewClasse({ ...newClasse, instructions_pdf_url: e.target.value })}
+                placeholder="https://example.com/instructions-classe-A.pdf"
+              />
+              <small>URL vers un PDF avec les instructions de nettoyage pour cette classe</small>
+            </div>
+
             <div className="form-actions">
               <button type="button" onClick={() => setShowAddForm(false)}>
                 Annuler
@@ -329,6 +342,19 @@ function ClassesManager({ token, canEdit, refreshData }) {
                 {classe.description && (
                   <div className="classe-description">
                     {classe.description}
+                  </div>
+                )}
+
+                {classe.instructions_pdf_url && (
+                  <div className="classe-pdf">
+                    <a 
+                      href={classe.instructions_pdf_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="pdf-link"
+                    >
+                      📄 Instructions PDF
+                    </a>
                   </div>
                 )}
 
@@ -524,6 +550,29 @@ function ClassesManager({ token, canEdit, refreshData }) {
           font-size: 12px;
           color: #666;
           margin-bottom: 8px;
+        }
+
+        .classe-pdf {
+          margin-bottom: 8px;
+        }
+
+        .pdf-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: #007bff;
+          text-decoration: none;
+          font-size: 12px;
+          font-weight: 500;
+          padding: 4px 8px;
+          border: 1px solid #007bff;
+          border-radius: 4px;
+          transition: all 0.2s;
+        }
+
+        .pdf-link:hover {
+          background: #007bff;
+          color: white;
         }
 
         .classe-meta {

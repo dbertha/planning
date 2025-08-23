@@ -4,7 +4,8 @@ import {
   getFamillesWithPreferences, 
   isFamilleAvailableForPeriod,
   addFamilleExclusion,
-  getFamilleExclusions
+  getFamilleExclusions,
+  validateAdminSession
 } from './db.js';
 
 export default async function handler(req, res) {
@@ -46,7 +47,10 @@ async function handleGet(req, res) {
 
     switch (action) {
       case 'list':
-        const familles = await getFamillesWithPreferences(planning.id);
+        // Vérifier si c'est un admin pour inclure les familles archivées
+        const sessionToken = req.headers['x-admin-session'];
+        const isAdmin = sessionToken ? (await validateAdminSession(sessionToken)).isAdmin : false;
+        const familles = await getFamillesWithPreferences(planning.id, isAdmin);
         res.status(200).json(familles);
         break;
 
@@ -188,17 +192,19 @@ async function handlePost(req, res) {
         break;
 
       case 'add_exclusion':
-        if (!data.famille_id || !data.date_debut || !data.date_fin) {
+        // Les données peuvent être dans data ou directement dans req.body (legacy)
+        const exclusionData = data || req.body;
+        if (!exclusionData.famille_id || !exclusionData.date_debut || !exclusionData.date_fin) {
           return res.status(400).json({ error: 'famille_id, date_debut et date_fin requis' });
         }
         
         const exclusionResult = await addFamilleExclusion(
-          data.famille_id,
+          exclusionData.famille_id,
           planning.id,
-          data.date_debut,
-          data.date_fin,
-          data.type,
-          data.notes
+          exclusionData.date_debut,
+          exclusionData.date_fin,
+          exclusionData.type,
+          exclusionData.notes
         );
         
         res.status(201).json(exclusionResult);
@@ -398,10 +404,10 @@ async function handleImport(planningId, familles, filename) {
     }
   }
 
-  // Enregistrer l'audit de l'import
+  // Enregistrer l'audit de l'import (adapter à la structure existante)
   await query(
-    'INSERT INTO imports (planning_id, type, filename, nb_lines, nb_success, nb_errors, errors_detail) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-    [planningId, 'familles', filename, familles.length, nbSuccess, nbErrors, JSON.stringify(errors)]
+    'INSERT INTO imports (planning_id, filename, total_families, successful_imports, errors) VALUES ($1, $2, $3, $4, $5)',
+    [planningId, filename, familles.length, nbSuccess, JSON.stringify(errors)]
   );
 
   return {

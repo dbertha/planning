@@ -84,48 +84,37 @@ function testDateUtils() {
 function testUsePlanningData() {
   console.log('\n🪝 Tests du hook usePlanningData');
   
-  // Simulation du hook
+  // Simulation du hook améliorée
   const createUsePlanningData = (token) => {
-    const [data, setData] = mockUseState({
+    // Simulation directe de l'état basé sur la présence du token
+    const hasToken = !!token;
+    const loading = !hasToken; // Pas de chargement si on a un token
+    const data = hasToken ? mockPlanningData : {
       planning: null,
       classes: [],
       semaines: [],
       familles: [],
       affectations: [],
       permissions: { isAdmin: false, canEdit: false }
-    });
-    const [loading, setLoading] = mockUseState(true);
-    const [error, setError] = mockUseState(null);
-    const [authToken, setAuthToken] = mockUseState(null);
-    
-    // Simulation du chargement des données
-    mockUseEffect(() => {
-      if (token) {
-        setLoading(false);
-        setData(mockPlanningData);
-      }
-    }, [token]);
+    };
     
     const loginAdmin = async (password) => {
       if (password === 'test123') {
-        setAuthToken('admin_session_token');
-        setData(mockAdminData);
-        return { success: true };
+        return { success: true, data: mockAdminData };
       }
       return { success: false, error: 'Mot de passe incorrect' };
     };
     
     const logoutAdmin = async () => {
-      setAuthToken(null);
-      setData(mockPlanningData);
+      return { success: true };
     };
     
     return {
       data,
       loading,
-      error,
-      isAdmin: data.permissions.isAdmin,
-      canEdit: data.permissions.canEdit,
+      error: null,
+      isAdmin: data.permissions?.isAdmin || false,
+      canEdit: data.permissions?.canEdit || false,
       loginAdmin,
       logoutAdmin
     };

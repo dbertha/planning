@@ -6,7 +6,7 @@ export function useAffectations(data, filters) {
 
     if (filters.search) {
       result = result.filter(a => 
-        a.famille.toLowerCase().includes(filters.search.toLowerCase())
+        (a.familleNom || '').toLowerCase().includes(filters.search.toLowerCase())
       );
     }
 

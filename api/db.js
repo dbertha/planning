@@ -58,8 +58,14 @@ export const initDatabase = async () => {
         couleur VARCHAR(7) NOT NULL,
         ordre INTEGER DEFAULT 0,
         description TEXT,
+        instructions_pdf_url TEXT, -- URL vers le PDF d'instructions
         PRIMARY KEY (id, planning_id)
       );
+    `);
+
+    // Ajouter la colonne PDF si elle n'existe pas (migration)
+    await query(`
+      ALTER TABLE classes ADD COLUMN IF NOT EXISTS instructions_pdf_url TEXT;
     `);
 
     // Table des familles (téléphone obligatoire pour SMS)
@@ -265,7 +271,12 @@ export const cleanExpiredSessions = async () => {
 };
 
 // Fonctions utilitaires pour les familles avec préférences et exclusions
-export const getFamillesWithPreferences = async (planningId) => {
+export const getFamillesWithPreferences = async (planningId, includeArchived = false) => {
+  let whereClause = 'WHERE f.planning_id = $1';
+  if (!includeArchived) {
+    whereClause += ' AND f.is_active = true';
+  }
+
   const result = await query(`
     SELECT f.*, 
            COALESCE(
@@ -278,9 +289,9 @@ export const getFamillesWithPreferences = async (planningId) => {
     LEFT JOIN classes c ON c.id = ANY(f.classes_preferences) AND c.planning_id = f.planning_id
     LEFT JOIN familles_exclusions fe ON fe.famille_id = f.id
     LEFT JOIN affectations a ON a.famille_id = f.id
-    WHERE f.planning_id = $1 AND f.is_active = true
+    ${whereClause}
     GROUP BY f.id
-    ORDER BY f.nom
+    ORDER BY f.is_active DESC, f.nom
   `, [planningId]);
   
   return result.rows;
@@ -386,6 +397,227 @@ export const getFamilleExclusions = async (familleId, planningId) => {
     'SELECT * FROM familles_exclusions WHERE famille_id = $1 AND planning_id = $2 ORDER BY date_debut',
     [familleId, planningId]
   );
+  
+  return result.rows;
+};
+
+// Distribution automatique pour une semaine
+export const autoDistributeWeek = async (semaineId, planningId) => {
+  try {
+    // 1. Récupérer les informations de la semaine
+    const semaineResult = await query(
+      'SELECT debut, fin FROM semaines WHERE id = $1 AND planning_id = $2',
+      [semaineId, planningId]
+    );
+
+    if (semaineResult.rows.length === 0) {
+      throw new Error('Semaine introuvable');
+    }
+
+    const { debut, fin } = semaineResult.rows[0];
+
+    // 2. Récupérer toutes les classes
+    const classesResult = await query(
+      'SELECT id, nom FROM classes WHERE planning_id = $1 ORDER BY ordre, id',
+      [planningId]
+    );
+
+    const classes = classesResult.rows;
+    if (classes.length === 0) {
+      throw new Error('Aucune classe trouvée pour ce planning');
+    }
+
+    // 3. Récupérer les familles disponibles avec leurs statistiques
+    const famillesStats = await calculateFamiliesStats(planningId, debut);
+
+    // 4. Trouver les classes déjà occupées pour cette semaine
+    const occupiedCellsResult = await query(
+      'SELECT classe_id FROM affectations WHERE semaine_id = $1 AND planning_id = $2',
+      [semaineId, planningId]
+    );
+    
+    const occupiedClasses = new Set(occupiedCellsResult.rows.map(row => row.classe_id));
+
+    // 5. Filtrer les classes disponibles
+    const availableClasses = classes.filter(classe => !occupiedClasses.has(classe.id));
+
+    if (availableClasses.length === 0) {
+      return {
+        success: true,
+        message: 'Toutes les classes sont déjà occupées pour cette semaine',
+        affectations_created: 0
+      };
+    }
+
+    // 6. Algorithme de distribution équitable
+    const affectationsToCreate = [];
+    
+    for (const classe of availableClasses) {
+      // Trouver les familles disponibles pour cette classe et cette période
+      const availableFamilies = await getAvailableFamiliesForPeriod(
+        classe.id, 
+        semaineId, 
+        planningId, 
+        debut, 
+        fin
+      );
+
+      if (availableFamilies.length === 0) {
+        continue;
+      }
+
+      // Enrichir avec les statistiques et calculer le score de priorité
+      const familiesWithScores = availableFamilies.map(famille => {
+        const stats = famillesStats.find(s => s.id === famille.id) || {
+          current_affectations: 0,
+          percentage_completed: 0
+        };
+
+        // Score de priorité basé sur :
+        // 1. Pourcentage de nettoyages déjà effectués (plus faible = priorité plus haute)
+        // 2. Préférence pour cette classe (bonus)
+        // 3. Randomisation légère pour éviter la monotonie
+        let priorityScore = 100 - stats.percentage_completed; // Base : moins on a fait, plus on est prioritaire
+        
+        if (famille.has_preference) {
+          priorityScore += 20; // Bonus pour les préférences
+        }
+        
+        // Petit facteur aléatoire pour éviter les patterns trop prévisibles
+        priorityScore += Math.random() * 10;
+
+        return {
+          ...famille,
+          ...stats,
+          priorityScore
+        };
+      });
+
+      // Trier par score de priorité (décroissant)
+      familiesWithScores.sort((a, b) => b.priorityScore - a.priorityScore);
+
+      // Sélectionner la famille avec le meilleur score
+      const selectedFamily = familiesWithScores[0];
+
+      affectationsToCreate.push({
+        famille_id: selectedFamily.id,
+        classe_id: classe.id,
+        semaine_id: semaineId,
+        notes: `Attribution automatique (${selectedFamily.percentage_completed.toFixed(1)}% complété)`
+      });
+    }
+
+    // 7. Créer les affectations en base
+    let createdCount = 0;
+    const createdAffectations = [];
+
+    for (const affectation of affectationsToCreate) {
+      try {
+        const result = await query(
+          'INSERT INTO affectations (planning_id, famille_id, classe_id, semaine_id, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [planningId, affectation.famille_id, affectation.classe_id, affectation.semaine_id, affectation.notes]
+        );
+        
+        createdAffectations.push(result.rows[0]);
+        createdCount++;
+      } catch (error) {
+        console.warn(`Erreur lors de la création d'une affectation:`, error.message);
+        // Continuer avec les autres affectations
+      }
+    }
+
+    return {
+      success: true,
+      message: `${createdCount} affectation(s) créée(s) automatiquement`,
+      affectations_created: createdCount,
+      details: createdAffectations,
+      available_classes: availableClasses.length,
+      total_classes: classes.length
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de la distribution automatique:', error);
+    throw error;
+  }
+};
+
+// Fonction utilitaire pour calculer les statistiques des familles
+const calculateFamiliesStats = async (planningId, currentDate) => {
+  const result = await query(`
+    SELECT 
+      f.id,
+      f.nom,
+      f.nb_nettoyage,
+      COUNT(a.id) as current_affectations,
+      CASE 
+        WHEN f.nb_nettoyage > 0 THEN (COUNT(a.id)::float / f.nb_nettoyage * 100)
+        ELSE 0
+      END as percentage_completed,
+      -- Calculer le pourcentage attendu basé sur la progression dans l'année
+      CASE 
+        WHEN total_weeks.total > 0 THEN (weeks_passed.passed::float / total_weeks.total * f.nb_nettoyage)
+        ELSE 0
+      END as expected_affectations_by_now
+    FROM familles f
+    LEFT JOIN affectations a ON a.famille_id = f.id AND a.planning_id = f.planning_id
+    LEFT JOIN semaines s ON a.semaine_id = s.id AND a.planning_id = s.planning_id
+    -- Calculer le total de semaines dans le planning
+    CROSS JOIN (
+      SELECT COUNT(*) as total 
+      FROM semaines 
+      WHERE planning_id = $1
+    ) total_weeks
+    -- Calculer les semaines passées jusqu'à maintenant
+    CROSS JOIN (
+      SELECT COUNT(*) as passed 
+      FROM semaines 
+      WHERE planning_id = $1 AND debut <= $2
+    ) weeks_passed
+    WHERE f.planning_id = $1 AND f.is_active = true
+    GROUP BY f.id, f.nom, f.nb_nettoyage, total_weeks.total, weeks_passed.passed
+    ORDER BY percentage_completed ASC, f.nom
+  `, [planningId, currentDate]);
+
+  return result.rows;
+};
+
+// Fonction utilitaire pour obtenir les familles disponibles pour une classe et période spécifique
+const getAvailableFamiliesForPeriod = async (classeId, semaineId, planningId, debut, fin) => {
+  const result = await query(`
+    SELECT f.id, f.nom, f.telephone, f.nb_nettoyage, f.classes_preferences,
+           CASE 
+             WHEN $1 = ANY(f.classes_preferences) THEN true
+             ELSE false
+           END as has_preference,
+           COUNT(a.id) as current_affectations
+    FROM familles f
+    LEFT JOIN affectations a ON a.famille_id = f.id AND a.planning_id = f.planning_id
+    WHERE f.planning_id = $2 AND f.is_active = true
+      -- Pas déjà affectée à une autre cellule cette semaine
+      AND NOT EXISTS (
+        SELECT 1 FROM affectations a2 
+        WHERE a2.famille_id = f.id 
+          AND a2.semaine_id = $3 
+          AND a2.planning_id = $2
+      )
+      -- Pas d'exclusion temporelle
+      AND NOT EXISTS (
+        SELECT 1 FROM familles_exclusions fe
+        WHERE fe.famille_id = f.id 
+          AND fe.planning_id = $2
+          AND (
+            (fe.date_debut <= $4 AND fe.date_fin >= $4) OR
+            (fe.date_debut <= $5 AND fe.date_fin >= $5) OR
+            (fe.date_debut >= $4 AND fe.date_fin <= $5)
+          )
+      )
+    GROUP BY f.id, f.nom, f.telephone, f.nb_nettoyage, f.classes_preferences
+    HAVING COUNT(a.id) < f.nb_nettoyage
+    ORDER BY 
+      CASE WHEN $1 = ANY(f.classes_preferences) THEN true ELSE false END DESC,
+      COUNT(a.id) ASC,
+      f.nom
+  `, [classeId, planningId, semaineId, debut, fin]);
   
   return result.rows;
 }; 
