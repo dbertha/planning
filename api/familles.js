@@ -171,6 +171,21 @@ async function handlePost(req, res) {
           return res.status(400).json({ error: 'Numéro de téléphone obligatoire pour les SMS' });
         }
 
+        // Valider que les classes préférées existent dans ce planning
+        const classesPreferences = data.classes_preferences || [];
+        if (classesPreferences.length > 0) {
+          for (const classeId of classesPreferences) {
+            const existingClasse = await query(
+              'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
+              [classeId, planning.id]
+            );
+            
+            if (existingClasse.rows.length === 0) {
+              return res.status(400).json({ error: `Classe '${classeId}' n'existe pas dans ce planning` });
+            }
+          }
+        }
+
         const createResult = await query(
           'INSERT INTO familles (planning_id, nom, email, telephone, nb_nettoyage, classes_preferences, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
           [
@@ -179,7 +194,7 @@ async function handlePost(req, res) {
             data.email, 
             data.telephone.trim(), 
             data.nb_nettoyage || 3, 
-            data.classes_preferences || [], 
+            classesPreferences, 
             data.notes
           ]
         );
@@ -271,6 +286,21 @@ async function handlePut(req, res) {
         return res.status(400).json({ error: 'Numéro de téléphone obligatoire pour les SMS' });
       }
 
+      // Valider que les classes préférées existent dans ce planning
+      const classesPreferences = data.classes_preferences || [];
+      if (classesPreferences.length > 0) {
+        for (const classeId of classesPreferences) {
+          const existingClasse = await query(
+            'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
+            [classeId, planning.id]
+          );
+          
+          if (existingClasse.rows.length === 0) {
+            return res.status(400).json({ error: `Classe '${classeId}' n'existe pas dans ce planning` });
+          }
+        }
+      }
+
       const result = await query(
         'UPDATE familles SET nom = $1, email = $2, telephone = $3, nb_nettoyage = $4, classes_preferences = $5, notes = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 AND planning_id = $8 RETURNING *',
         [
@@ -278,7 +308,7 @@ async function handlePut(req, res) {
           data.email, 
           data.telephone?.trim(), 
           data.nb_nettoyage, 
-          data.classes_preferences, 
+          classesPreferences, 
           data.notes, 
           id, 
           planning.id
@@ -371,6 +401,20 @@ async function handleImport(planningId, familles, filename) {
         classesPreferences = famille.classes_preferences.split(',').map(id => id.trim()).filter(id => id);
       } else if (Array.isArray(famille.classes_preferences)) {
         classesPreferences = famille.classes_preferences;
+      }
+
+      // Valider que les classes préférées existent dans ce planning
+      if (classesPreferences.length > 0) {
+        for (const classeId of classesPreferences) {
+          const existingClasse = await query(
+            'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
+            [classeId, planningId]
+          );
+          
+          if (existingClasse.rows.length === 0) {
+            throw new Error(`Classe '${classeId}' n'existe pas dans ce planning`);
+          }
+        }
       }
 
       // Valider le nombre de nettoyages

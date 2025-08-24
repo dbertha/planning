@@ -353,6 +353,12 @@ Exemples:
       file: 'classes-import.test.js',
       description: 'Tests d\'import des classes via CSV'
     });
+
+    testSuites.push({
+      name: 'Tests Validation Classes Préférées',
+      file: 'famille-class-validation.test.js',
+      description: 'Tests de validation des classes préférées familles'
+    });
   }
   
   if (!options.apiOnly) {
