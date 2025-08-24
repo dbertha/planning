@@ -42,15 +42,32 @@ else
     exit 1
 fi
 
+# Démarrer le frontend en arrière-plan
+echo "🌐 Démarrage du frontend (port 5173)..."
+npm run dev > frontend.log 2>&1 &
+FRONTEND_PID=$!
+
+# Attendre que le frontend démarre
+echo "⏳ Attente du démarrage du frontend..."
+sleep 5
+
+# Vérifier que le frontend fonctionne
+if curl -s http://localhost:5173 > /dev/null; then
+    echo "✅ Frontend démarré avec succès"
+else
+    echo "⚠️  Frontend en cours de démarrage..."
+fi
+
 echo ""
-echo "🎯 PRÊT POUR LE DÉVELOPPEMENT"
+echo "🎯 ENVIRONNEMENT DE DÉVELOPPEMENT PRÊT"
 echo ""
 echo "📡 API Backend: http://localhost:3000"
-echo "🌐 Frontend: Lancez 'npm run dev' dans un autre terminal"
+echo "🌐 Frontend React: http://localhost:5173"
 echo ""
 echo "📋 Commandes utiles:"
-echo "   - Arrêter API: kill $API_PID"
+echo "   - Arrêter tout: Ctrl+C"
 echo "   - Logs API: tail -f api.log"
+echo "   - Logs Frontend: tail -f frontend.log"
 echo "   - Tests: npm test"
 echo ""
 echo "📱 Endpoints disponibles:"
@@ -58,9 +75,36 @@ echo "   - http://localhost:3000/health"
 echo "   - http://localhost:3000/api/planning"
 echo "   - http://localhost:3000/api/sms"
 echo ""
-echo "💡 Pour démarrer le frontend:"
-echo "   npm run dev"
 
-# Garder le script en vie
-echo "⌨️  Appuyez sur Ctrl+C pour arrêter l'API"
-wait $API_PID
+# Fonction pour nettoyer à la sortie
+cleanup() {
+    echo ""
+    echo "🔄 Arrêt des serveurs..."
+    kill $API_PID 2>/dev/null
+    kill $FRONTEND_PID 2>/dev/null
+    echo "✅ Serveurs arrêtés"
+    exit 0
+}
+
+# Intercepter Ctrl+C
+trap cleanup INT
+
+echo "⌨️  Appuyez sur Ctrl+C pour arrêter tous les serveurs"
+echo "🔗 Ouvrez votre navigateur sur: http://localhost:5173"
+echo ""
+
+# Garder le script en vie et surveiller les processus
+while true; do
+    # Vérifier que les processus tournent encore
+    if ! kill -0 $API_PID 2>/dev/null; then
+        echo "❌ API arrêtée de manière inattendue"
+        break
+    fi
+    if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+        echo "❌ Frontend arrêté de manière inattendue"
+        break
+    fi
+    sleep 2
+done
+
+cleanup

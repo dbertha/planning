@@ -1,251 +1,143 @@
-# 🚀 Guide de Développement - Planning Nettoyage
+# Guide de Développement - Planning App
 
-Ce guide explique les bonnes pratiques pour développer avec **Vite + Vercel**.
+## 🚀 Démarrage rapide
 
-## 🏗️ **Architecture**
-
-### **Production (Vercel)**
-```
-https://myapp.vercel.app/
-├── Frontend (Vite build) 
-└── /api/* (Vercel Functions)
-```
-
-### **Développement : 2 Approches**
-
-## **🎯 Approche 1 : Vercel Dev (Recommandée)**
-
-### Avantages ✅
-- ✅ **Identique à la production** - même domaine/port
-- ✅ **Pas de problème CORS** 
-- ✅ **Configuration simple**
-- ✅ **Serverless functions natives**
-
-### Commandes
+### Option 1: Script automatique (Recommandé)
 ```bash
-# Installation Vercel CLI (si pas fait)
-npm i -g vercel
-
-# Développement (port 3000 par défaut)
-npm run dev
+npm start
 # ou
-vercel dev
-
-# Tests
-npm test  # URL: http://localhost:3000
-
-# Spécifier un port différent
-vercel dev --listen 8080
+./start-dev.sh
 ```
 
-### Configuration
-```json
-// vercel.json
-{
-  "framework": "vite",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install"
-}
-```
+Cela démarre automatiquement :
+- ✅ API Backend sur http://localhost:3000
+- ✅ Frontend React sur http://localhost:5173  
+- ✅ Proxy automatique des requêtes `/api/*`
 
----
-
-## **🔄 Approche 2 : Vite Dev + Vercel Dev Séparé**
-
-### Avantages ✅
-- ✅ **Hot Reload Vite ultra-rapide**
-- ✅ **DevTools Vite optimisés**
-- ✅ **Workflows séparés frontend/backend**
-
-### Inconvénients ❌
-- ❌ Plus complexe (2 serveurs)
-- ❌ Configuration proxy requise
-- ❌ Peut différer de la production
-
-### Commandes
+### Option 2: Démarrage manuel
 ```bash
-# Terminal 1 : APIs Vercel
-vercel dev --listen 3000
+# Terminal 1 - API Backend
+source ~/.nvm/nvm.sh && nvm use 18
+set -a && source .env.local && set +a  
+npm run dev:api
 
-# Terminal 2 : Frontend Vite  
-npm run dev:vite  # Port 5173 avec proxy
-
-# Tests
-API_BASE_URL=http://localhost:5173 npm test
+# Terminal 2 - Frontend React
+npm run dev
 ```
 
-### Configuration Vite (Déjà configurée)
-```javascript
-// vite.config.js
-export default defineConfig({
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': 'http://localhost:3000'  // Proxy vers Vercel
-    }
-  }
-})
-```
+## 🔧 Configuration
 
----
-
-## **🧪 Tests selon l'Approche**
-
-### **Auto-détection intelligente**
+### Variables d'environnement requises
+Créer `.env.local` avec :
 ```bash
-# Détection automatique du port/URL
+# Base de données
+DATABASE_URL=postgresql://...
+
+# SMS (Twilio)
+SMS_ENABLED=true
+SMS_PROVIDER=twilio
+TWILIO_SID=ACxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxx
+TWILIO_SENDER=+15551234567
+
+# Admin (optionnel)
+DEFAULT_ADMIN_PASSWORD=admin123
+
+# Sécurité
+ADMIN_SALT=your_random_salt
+NODE_ENV=development
+```
+
+### Vérification des variables
+```bash
+npm run check:env
+```
+
+## 🧪 Tests
+
+```bash
+# Tous les tests
 npm test
 
-# Force l'URL spécifique
-API_BASE_URL=http://localhost:5173 npm test
-API_BASE_URL=https://myapp.vercel.app npm test
+# Tests API uniquement  
+npm run test:api
+
+# Tests composants uniquement
+npm run test:components
 ```
 
-### **Variables d'environnement**
+## 📱 Fonctionnalités
+
+### Accès à l'application
+- **Interface publique** : http://localhost:5173
+- **Admin** : Cliquer sur "Admin" puis saisir le token + mot de passe
+
+### SMS planifiés
+1. Aller dans Admin → SMS Planifiés
+2. Créer un SMS avec : jour, heure, message
+3. Le SMS sera envoyé automatiquement via service externe
+
+### Mots de passe par défaut
+- **Admin** : `admin123` (configurable via `DEFAULT_ADMIN_PASSWORD`)
+- **Token planning** : Généré automatiquement ou personnalisé
+
+## 🔍 Debug
+
+### Logs
 ```bash
-# Vercel dev (port 3000)
-API_BASE_URL=http://localhost:3000 npm test
+# Logs API en temps réel
+tail -f api.log
 
-# Vite dev avec proxy (port 5173)  
-API_BASE_URL=http://localhost:5173 npm test
-
-# Production Vercel
-API_BASE_URL=https://myapp.vercel.app npm test
+# Logs Frontend en temps réel  
+tail -f frontend.log
 ```
 
----
+### Endpoints utiles
+- **Health check** : http://localhost:3000/health
+- **Test SMS cron** : `curl -X POST http://localhost:3000/api/sms-cron`
 
-## **📊 Comparaison des Approches**
+### Problèmes courants
 
-| Critère | Vercel Dev | Vite + Vercel |
-|---------|------------|---------------|
-| **Simplicité** | 🟢 Simple | 🟡 Moyen |
-| **Prod Similarity** | 🟢 Identique | 🟡 Proche |
-| **Hot Reload** | 🟡 Standard | 🟢 Ultra-rapide |
-| **CORS** | 🟢 Aucun souci | 🟡 Config nécessaire |
-| **DevTools** | 🟡 Standard | 🟢 Optimisés |
-| **Performance** | 🟢 Très bon | 🟢 Excellent |
+**Erreur 405 sur `/api/sms`**
+→ Vérifier que l'API backend tourne sur le port 3000
 
----
+**Variables non trouvées**
+→ Exécuter `npm run check:env` pour diagnostiquer
 
-## **🎯 Recommandations par Cas d'Usage**
+**SMS non envoyés**
+→ Vérifier `NODE_ENV=development` (mode test) vs `production`
 
-### **🥇 Vercel Dev (Recommandé pour la plupart)**
+## 📦 Déploiement
+
+### Vercel
 ```bash
-npm run dev  # Port 3000
-```
-**Utilisez si :**
-- ✅ Vous travaillez sur les APIs serverless
-- ✅ Vous voulez un environnement identique à la production
-- ✅ Vous préférez la simplicité
-- ✅ Vous travaillez en équipe (moins de confusion)
-
-### **🥈 Vite Dev Séparé (Pour développement frontend intensif)**
-```bash
-# Terminal 1
-vercel dev --listen 3000
-
-# Terminal 2  
-npm run dev:vite  # Port 5173
-```
-**Utilisez si :**
-- ✅ Vous travaillez principalement sur l'UI React
-- ✅ Vous voulez le hot reload ultra-rapide de Vite
-- ✅ Vous ne touchez pas souvent aux APIs
-- ✅ Vous maîtrisez les configs proxy
-
----
-
-## **🔧 Configuration Avancée**
-
-### **Ports personnalisés**
-```bash
-# Vercel dev port custom
-vercel dev --listen 8080
-
-# Vite dev port custom
-npm run dev:vite -- --port 4000
-
-# Tests avec port custom
-API_BASE_URL=http://localhost:8080 npm test
+# Vérifier et déployer
+npm run vercel:deploy
 ```
 
-### **HTTPS local**
-```bash
-# Vercel dev avec HTTPS
-vercel dev --local-config vercel.json
+### Variables Vercel
+Toutes les variables de `.env.local` doivent être configurées sur Vercel Dashboard.
 
-# Vite dev avec HTTPS
-npm run dev:vite -- --https
+## 🔧 Architecture
+
+```
+├── api/                 # Backend Node.js
+│   ├── auth.js         # Authentification
+│   ├── planning.js     # Gestion planning
+│   ├── familles.js     # Gestion familles  
+│   ├── sms.js          # SMS (Twilio/Spryng)
+│   └── sms-cron.js     # SMS planifiés
+├── src/                # Frontend React
+│   ├── components/     # Composants UI
+│   ├── hooks/          # Hooks React
+│   └── utils/          # Utilitaires
+└── tests/              # Suite de tests
 ```
 
-### **Variables d'environnement**
-```bash
-# Charger .env.local
-vercel dev
+## 🎯 Workflow de développement
 
-# Avec variables custom
-DATABASE_URL=xxx vercel dev
-```
-
----
-
-## **🐛 Troubleshooting**
-
-### **❌ "Cannot connect to API"**
-```bash
-# Vérifier que Vercel dev tourne
-vercel dev --listen 3000
-
-# Ou utiliser l'approche intégrée
-npm run dev
-```
-
-### **❌ "CORS error"**
-```bash
-# Utiliser vercel dev au lieu de vite séparé
-npm run dev
-
-# Ou vérifier la config proxy dans vite.config.js
-```
-
-### **❌ "Tests fail"**
-```bash
-# Spécifier l'URL correcte
-API_BASE_URL=http://localhost:3000 npm test
-
-# Ou démarrer le bon serveur
-npm run dev  # puis dans un autre terminal : npm test
-```
-
-### **❌ "Port already in use"**
-```bash
-# Changer le port
-vercel dev --listen 3001
-
-# Ou tuer le processus
-sudo lsof -ti:3000 | xargs kill -9
-```
-
----
-
-## **📚 Ressources**
-
-- [Vercel CLI Documentation](https://vercel.com/docs/cli)
-- [Vite Configuration](https://vitejs.dev/config/)
-- [Vercel Functions](https://vercel.com/docs/functions)
-- [Vite Proxy Configuration](https://vitejs.dev/config/server-options.html#server-proxy)
-
----
-
-## **💡 Conseil Final**
-
-**Commencez par l'approche Vercel Dev** pour sa simplicité :
-```bash
-npm run dev
-```
-
-**Basculez vers Vite séparé** seulement si vous avez besoin du hot reload ultra-rapide pour du développement UI intensif.
-
-**En production** : Tout fonctionne pareil sur Vercel ! 🚀 
+1. **Modifier le code** (API ou Frontend)
+2. **Les serveurs redémarrent automatiquement** (nodemon + vite)
+3. **Tester** via interface ou `npm test`
+4. **Commiter** et pousser les changements
+5. **Déployer** avec `npm run vercel:deploy`

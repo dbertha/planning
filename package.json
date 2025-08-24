@@ -13,7 +13,8 @@
     "test:components": "node tests/run-all-tests.js --components-only",
     "test:help": "node tests/run-all-tests.js --help",
     "check:env": "node check-vercel-env.js",
-    "vercel:deploy": "npm run check:env && vercel --prod"
+    "vercel:deploy": "npm run check:env && vercel --prod",
+    "start": "./start-dev.sh"
   },
   "name": "planning",
   "version": "1.0.0", 
