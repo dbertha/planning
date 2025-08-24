@@ -361,6 +361,24 @@ Exemples:
       file: 'auto-distribution.test.js',
       description: 'Tests de la distribution automatique des nettoyages'
     });
+
+    testSuites.push({
+      name: 'Tests Fonctionnalités Admin',
+      file: 'admin-features.test.js',
+      description: 'Tests des nouvelles fonctionnalités administrateur'
+    });
+
+    testSuites.push({
+      name: 'Tests SMS',
+      file: 'sms.test.js',
+      description: 'Tests de l\'intégration SMS avec Spryng'
+    });
+
+    testSuites.push({
+      name: 'Tests d\'Intégration',
+      file: 'integration.test.js',
+      description: 'Tests d\'intégration bout-en-bout'
+    });
   }
 
   // Exécution des tests
