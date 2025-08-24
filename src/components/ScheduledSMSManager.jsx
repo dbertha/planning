@@ -42,10 +42,16 @@ export function ScheduledSMSManager({ token, sessionToken, canEdit }) {
   const loadScheduledSMS = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/sms?token=${token}&action=list_scheduled`, {
+      const response = await fetch('/api/sms', {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'X-Admin-Session': sessionToken
-        }
+        },
+        body: JSON.stringify({
+          token,
+          action: 'list_scheduled'
+        })
       });
       
       const result = await response.json();

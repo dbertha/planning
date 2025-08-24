@@ -80,6 +80,13 @@ const requiredVars = {
     required: false,
     description: 'Numéro de test pour SMS',
     example: '0032497890341'
+  },
+  
+  // Administration (optionnel)
+  'DEFAULT_ADMIN_PASSWORD': {
+    required: false,
+    description: 'Mot de passe admin par défaut pour nouveaux plannings',
+    example: 'admin123'
   }
 };
 

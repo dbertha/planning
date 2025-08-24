@@ -145,11 +145,14 @@ async function handlePost(req, res) {
           return res.status(400).json({ error: 'Nom du planning requis' });
         }
 
+        // Utiliser le mot de passe par défaut si pas fourni
+        const finalPassword = adminPassword || process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
+        
         const newPlanning = await createPlanning(
           name, 
           description, 
           parseInt(year) || new Date().getFullYear(),
-          adminPassword,
+          finalPassword,
           customToken
         );
 
