@@ -347,6 +347,12 @@ Exemples:
       file: 'exclusions.test.js',
       description: 'Tests des contraintes d\'exclusion des familles'
     });
+
+    testSuites.push({
+      name: 'Tests Import Classes',
+      file: 'classes-import.test.js',
+      description: 'Tests d\'import des classes via CSV'
+    });
   }
   
   if (!options.apiOnly) {
