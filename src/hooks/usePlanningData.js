@@ -358,6 +358,7 @@ export function usePlanningData(token) {
     deleteAffectation,
     toggleSemainePublication,
     autoDistributeWeek,
-    refreshData: loadPlanningData
+    refreshData: loadPlanningData,
+    sessionToken: authToken
   };
 } 

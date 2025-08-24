@@ -8,7 +8,8 @@ import {
   isFamilleAvailableForPeriod,
   validateAdminSession,
   toggleSemainePublication,
-  autoDistributeWeek
+  autoDistributeWeek,
+  createNextWeek
 } from './db.js';
 
 export default async function handler(req, res) {
@@ -365,6 +366,12 @@ async function handlePost(req, res) {
         const { semaineId: targetSemaineId } = data;
         const distributionResult = await autoDistributeWeek(targetSemaineId, planning.id);
         res.status(200).json(distributionResult);
+        break;
+
+      case 'create_next_week':
+        // Créer automatiquement la semaine suivante
+        const nextWeekData = await createNextWeek(planning.id);
+        res.status(201).json(nextWeekData);
         break;
 
       default:

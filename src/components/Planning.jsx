@@ -25,7 +25,8 @@ export function Planning() {
     createAffectation,
     deleteAffectation,
     toggleSemainePublication,
-    autoDistributeWeek
+    autoDistributeWeek,
+    sessionToken
   } = usePlanningData(token);
 
   const [filters, setFilters] = useState({
@@ -275,6 +276,8 @@ export function Planning() {
           logoutAdmin={logoutAdmin}
           refreshData={refreshData}
           toggleSemainePublication={toggleSemainePublication}
+          planningData={data}
+          sessionToken={sessionToken}
         />
       )}
       

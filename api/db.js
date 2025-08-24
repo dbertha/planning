@@ -204,9 +204,17 @@ export const validateTokenAndGetPlanning = async (token) => {
 };
 
 // Créer un nouveau planning avec mot de passe admin
-export const createPlanning = async (name, description, year, adminPassword) => {
-  const token = generateSecureToken();
+export const createPlanning = async (name, description, year, adminPassword, customToken) => {
+  const token = customToken || generateSecureToken();
   const passwordHash = adminPassword ? hashPassword(adminPassword) : null;
+  
+  // Vérifier que le token personnalisé n'existe pas déjà
+  if (customToken) {
+    const existingResult = await query('SELECT id FROM plannings WHERE token = $1', [customToken]);
+    if (existingResult.rows.length > 0) {
+      throw new Error('Ce token existe déjà. Choisissez un token différent.');
+    }
+  }
   
   const result = await query(
     'INSERT INTO plannings (token, name, description, annee_scolaire, admin_password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING *',
@@ -620,4 +628,131 @@ const getAvailableFamiliesForPeriod = async (classeId, semaineId, planningId, de
   `, [classeId, planningId, semaineId, debut, fin]);
   
   return result.rows;
-}; 
+};
+
+// Créer automatiquement la semaine suivante
+export const createNextWeek = async (planningId) => {
+  try {
+    // Récupérer la dernière semaine existante
+    const lastWeekResult = await query(
+      'SELECT * FROM semaines WHERE planning_id = $1 ORDER BY debut DESC LIMIT 1',
+      [planningId]
+    );
+    
+
+
+    let nextWeekData;
+    
+    if (lastWeekResult.rows.length === 0) {
+      // Aucune semaine n'existe, créer la première semaine (lundi de cette semaine)
+      const today = new Date();
+      const monday = getMondayOfWeek(today);
+      nextWeekData = createWeekDefinition(monday, planningId);
+    } else {
+      // Calculer la semaine suivante
+      const lastWeek = lastWeekResult.rows[0];
+      const lastEndDate = new Date(lastWeek.fin);
+      
+      // Calculer le lundi suivant la fin de la dernière semaine
+      // Si fin = samedi, lundi suivant = samedi + 2 jours
+      // Si fin = dimanche, lundi suivant = dimanche + 1 jour
+      let nextMonday = new Date(lastEndDate);
+      const lastWeekEndDay = lastEndDate.getDay(); // 0=dimanche, 6=samedi
+      
+      if (lastWeekEndDay === 0) {
+        // Dimanche, ajouter 1 jour pour lundi
+        nextMonday.setDate(lastEndDate.getDate() + 1);
+      } else if (lastWeekEndDay === 6) {
+        // Samedi, ajouter 2 jours pour lundi
+        nextMonday.setDate(lastEndDate.getDate() + 2);
+      } else {
+        // Autre jour (ne devrait pas arriver pour une semaine normale)
+        nextMonday.setDate(lastEndDate.getDate() + (8 - lastWeekEndDay));
+      }
+      
+
+      nextWeekData = createWeekDefinition(nextMonday, planningId);
+    }
+
+    // Vérifier que cette semaine n'existe pas déjà
+    const existingWeek = await query(
+      'SELECT id FROM semaines WHERE id = $1 AND planning_id = $2',
+      [nextWeekData.id, planningId]
+    );
+
+    if (existingWeek.rows.length > 0) {
+      return {
+        success: false,
+        message: `La semaine du ${formatDateForDisplay(nextWeekData.debut)} au ${formatDateForDisplay(nextWeekData.fin)} existe déjà`
+      };
+    }
+
+    // Créer la semaine
+    const result = await query(
+      'INSERT INTO semaines (id, planning_id, debut, fin, type, description, is_published) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [nextWeekData.id, planningId, nextWeekData.debut, nextWeekData.fin, nextWeekData.type, nextWeekData.description, nextWeekData.is_published]
+    );
+
+    return {
+      success: true,
+      semaine: result.rows[0],
+      message: `Semaine du ${formatDateForDisplay(nextWeekData.debut)} au ${formatDateForDisplay(nextWeekData.fin)} créée`
+    };
+
+  } catch (error) {
+    console.error('Erreur lors de la création de la semaine suivante:', error);
+    throw error;
+  }
+};
+
+// Fonctions utilitaires pour les semaines (importées des utils)
+function getMondayOfWeek(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+function createWeekDefinition(startDate, planningId = null) {
+  // Si startDate est déjà un lundi, l'utiliser directement
+  // Sinon, trouver le lundi de la semaine
+  let monday;
+  if (startDate.getDay() === 1) {
+    // C'est déjà un lundi
+    monday = new Date(startDate);
+  } else {
+    // Trouver le lundi de cette semaine
+    monday = getMondayOfWeek(startDate);
+  }
+  
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  
+  // Générer un ID unique: si planningId fourni, l'inclure, sinon utiliser timestamp
+  let weekId;
+  if (planningId) {
+    weekId = `${planningId}-${monday.toISOString().split('T')[0]}`;
+  } else {
+    weekId = monday.toISOString().split('T')[0];
+  }
+  
+  return {
+    id: weekId,
+    debut: monday.toISOString().split('T')[0],
+    fin: sunday.toISOString().split('T')[0],
+    type: 'NETTOYAGE',
+    description: `Semaine du ${monday.toLocaleDateString('fr-FR')} au ${sunday.toLocaleDateString('fr-FR')}`,
+    is_published: false
+  };
+}
+
+// Fonctions de vacances retirées - les administrateurs peuvent 
+// manuellement changer le type de semaine via l'interface
+
+function formatDateForDisplay(date) {
+  return new Date(date).toLocaleDateString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  });
+} 
