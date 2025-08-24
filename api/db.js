@@ -52,7 +52,7 @@ export const initDatabase = async () => {
     // Table des classes (zones de nettoyage)
     await query(`
       CREATE TABLE IF NOT EXISTS classes (
-        id VARCHAR(10),
+        id VARCHAR(20),
         planning_id INTEGER REFERENCES plannings(id) ON DELETE CASCADE,
         nom TEXT NOT NULL,
         couleur VARCHAR(7) NOT NULL,

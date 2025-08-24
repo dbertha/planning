@@ -101,28 +101,58 @@ async function testDownloadTemplate() {
   }
 }
 
+async function cleanupTestClasses() {
+  try {
+    // Nettoyer les classes de test existantes
+    const cleanupResponse = await fetch(`${API_BASE_URL}/api/planning`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Session': sessionToken
+      },
+      body: JSON.stringify({
+        token: testToken,
+        type: 'cleanup_test_classes'
+      })
+    });
+    
+    if (cleanupResponse.ok) {
+      log('🧹 Classes de test nettoyées', 'blue');
+    }
+  } catch (error) {
+    // Ignorer les erreurs de nettoyage
+    log('⚠️ Nettoyage ignoré (normal lors du premier test)', 'yellow');
+  }
+}
+
 async function testImportClasses() {
   try {
     log('📊 Test: Import de classes via CSV...', 'cyan');
     
+    // Nettoyer d'abord les anciennes données
+    await cleanupTestClasses();
+    
+    // Générer des IDs uniques pour chaque test
+    const uniqueId = Date.now().toString().slice(-6);
+    
     // Données de test pour l'import
     const testClasses = [
       {
-        id: 'TEST_A',
+        id: `TEST_A_${uniqueId}`,
         nom: 'Test Salle A',
         couleur: '#ff0000',
         ordre: '1',
         description: 'Salle de test A'
       },
       {
-        id: 'TEST_B',
+        id: `TEST_B_${uniqueId}`,
         nom: 'Test Salle B',
         couleur: '#00ff00',
         ordre: '2',
         description: 'Salle de test B'
       },
       {
-        id: 'TEST_C',
+        id: `TEST_C_${uniqueId}`,
         nom: 'Test Salle C',
         couleur: '#0000ff',
         ordre: '3',
@@ -167,10 +197,10 @@ async function testImportClasses() {
     }
 
     log(`✅ Import réussi: ${result.success}/${result.total_lines} classes`, 'green');
-    return true;
+    return { success: true, testClasses };
   } catch (error) {
     log(`❌ Erreur import classes: ${error.message}`, 'red');
-    return false;
+    return { success: false, testClasses: [] };
   }
 }
 
@@ -268,7 +298,7 @@ async function testImportValidation() {
   }
 }
 
-async function testClassesListing() {
+async function testClassesListing(expectedTestClasses) {
   try {
     log('📋 Test: Vérification des classes créées...', 'cyan');
     
@@ -281,19 +311,19 @@ async function testClassesListing() {
     const classes = await response.json();
     
     // Vérifier que les classes importées sont présentes
-    const expectedClasses = ['TEST_A', 'TEST_B', 'TEST_C'];
+    const expectedClassIds = expectedTestClasses.map(c => c.id);
     const foundClasses = classes.map(c => c.id);
     
-    for (const expectedId of expectedClasses) {
+    for (const expectedId of expectedClassIds) {
       if (!foundClasses.includes(expectedId)) {
         throw new Error(`Classe manquante: ${expectedId}`);
       }
     }
 
     // Vérifier les propriétés d'une classe
-    const testClassA = classes.find(c => c.id === 'TEST_A');
+    const testClassA = classes.find(c => c.id === expectedClassIds[0]);
     if (!testClassA) {
-      throw new Error('Classe TEST_A non trouvée');
+      throw new Error(`Première classe de test non trouvée: ${expectedClassIds[0]}`);
     }
 
     if (testClassA.nom !== 'Test Salle A') {
@@ -344,7 +374,8 @@ async function runClassesImportTests() {
 
   // Test 3: Import valide
   log('\n📋 Test 3: Import de classes valides');
-  if (await testImportClasses()) {
+  const importResult = await testImportClasses();
+  if (importResult.success) {
     passed++;
   } else {
     failed++;
@@ -360,7 +391,7 @@ async function runClassesImportTests() {
 
   // Test 5: Vérification des classes créées
   log('\n📋 Test 5: Vérification des classes dans la base');
-  if (await testClassesListing()) {
+  if (await testClassesListing(importResult.testClasses)) {
     passed++;
   } else {
     failed++;

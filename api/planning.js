@@ -307,6 +307,12 @@ async function handlePost(req, res) {
         const importResult = await handleClassesImport(planning.id, data.classes, data.filename);
         res.status(200).json(importResult);
         break;
+        
+      case 'cleanup_test_classes':
+        // Nettoyer les classes de test (celles qui commencent par 'TEST_')
+        await query('DELETE FROM classes WHERE planning_id = $1 AND id LIKE $2', [planning.id, 'TEST_%']);
+        res.status(200).json({ success: true, message: 'Classes de test supprimées' });
+        break;
 
       case 'semaine':
         const semaineResult = await query(
@@ -627,10 +633,12 @@ async function handleClassesImport(planningId, classes, filename) {
     }
   }
 
-  return {
+  const result = {
     total_lines: classes.length,
     success: nbSuccess,
     errors: nbErrors,
     error_details: errors
   };
+  
+  return result;
 }
