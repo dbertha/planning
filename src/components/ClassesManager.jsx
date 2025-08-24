@@ -5,6 +5,8 @@ function ClassesManager({ token, canEdit, refreshData }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importResult, setImportResult] = useState(null);
 
   // Formulaire pour nouvelle classe
   const [newClasse, setNewClasse] = useState({
@@ -126,6 +128,90 @@ function ClassesManager({ token, canEdit, refreshData }) {
     }
   };
 
+  const handleImport = async () => {
+    if (!importFile) {
+      setError('Veuillez sélectionner un fichier');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setImportResult(null);
+
+      // Lire le fichier CSV
+      const text = await importFile.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        throw new Error('Le fichier doit contenir au moins une ligne d\'en-tête et une ligne de données');
+      }
+
+      // Parser le CSV
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const classes = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const classe = {};
+        headers.forEach((header, index) => {
+          classe[header] = values[index] || '';
+        });
+        return classe;
+      });
+
+      // Envoyer à l'API
+      const response = await fetch('/api/planning', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          type: 'import_classes',
+          data: {
+            classes,
+            filename: importFile.name
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de l\'import');
+      }
+
+      const result = await response.json();
+      setImportResult(result);
+      setImportFile(null);
+      await loadClasses();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadTemplate = async () => {
+    try {
+      const response = await fetch(`/api/planning?token=${token}&type=classes_template`);
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement du template');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template_classes.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const generateClassesFromTemplate = () => {
     const template = [
       { id: 'A', nom: 'Partie A - Rez-de-chaussée', couleur: '#ffcccb', ordre: 1 },
@@ -210,6 +296,59 @@ function ClassesManager({ token, canEdit, refreshData }) {
           <button onClick={() => setError('')}>×</button>
         </div>
       )}
+
+      {/* Import Excel/CSV */}
+      <div className="import-section">
+        <h4>📊 Import Excel/CSV</h4>
+        <div className="import-controls">
+          <button
+            onClick={downloadTemplate}
+            className="btn btn-outline"
+            disabled={loading}
+          >
+            📥 Télécharger Template
+          </button>
+          <input
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            onChange={(e) => setImportFile(e.target.files[0])}
+            disabled={loading}
+          />
+          <button
+            onClick={handleImport}
+            disabled={!importFile || loading}
+            className="btn btn-success"
+          >
+            {loading ? 'Import...' : 'Importer'}
+          </button>
+        </div>
+
+        {importResult && (
+          <div className="import-result">
+            <h5>Résultat de l'import :</h5>
+            <div className="result-stats">
+              <span className="stat">📊 Total: {importResult.total_lines}</span>
+              <span className="stat success">✅ Réussis: {importResult.success}</span>
+              <span className="stat error">❌ Erreurs: {importResult.errors}</span>
+            </div>
+            {importResult.error_details && importResult.error_details.length > 0 && (
+              <div className="error-details">
+                <h6>Détails des erreurs :</h6>
+                {importResult.error_details.map((error, index) => (
+                  <div key={index} className="error-item">
+                    Ligne {error.ligne} ({error.classe}): {error.erreur}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="import-help">
+          <p><strong>Format attendu :</strong> CSV avec colonnes : id, nom, couleur, ordre, description</p>
+          <p><strong>Exemple :</strong> SALLE_A, Salle A, #ffcccb, 1, Description de la salle</p>
+        </div>
+      </div>
 
       {/* Formulaire d'ajout */}
       {showAddForm && (

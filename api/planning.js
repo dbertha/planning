@@ -195,6 +195,15 @@ async function handleGet(req, res) {
         case 'classes':
           result = await query('SELECT * FROM classes WHERE planning_id = $1 ORDER BY ordre, id', [planning.id]);
           break;
+        case 'classes_template':
+          // Générer un template CSV pour l'import de classes
+          const csvHeaders = 'id,nom,couleur,ordre,description';
+          const csvExample = 'SALLE_A,Salle A,#ffcccb,1,Salle de classe A\nSALLE_B,Salle B,#90ee90,2,Salle de classe B';
+          const csvContent = csvHeaders + '\n' + csvExample;
+          
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', 'attachment; filename="template_classes.csv"');
+          return res.status(200).send(csvContent);
         case 'semaines':
           let semainesQuery = 'SELECT * FROM semaines WHERE planning_id = $1';
           if (!isAdmin) {
@@ -292,6 +301,11 @@ async function handlePost(req, res) {
           [data.id, planning.id, data.nom, data.couleur, data.ordre || 0, data.description]
         );
         res.status(201).json(classeResult.rows[0]);
+        break;
+
+      case 'import_classes':
+        const importResult = await handleClassesImport(planning.id, data.classes, data.filename);
+        res.status(200).json(importResult);
         break;
 
       case 'semaine':
@@ -545,4 +559,78 @@ async function handleDelete(req, res) {
       res.status(500).json({ error: 'Erreur serveur' });
     }
   }
-} 
+}
+
+// Fonction d'import en lot pour les classes
+async function handleClassesImport(planningId, classes, filename) {
+  let nbSuccess = 0;
+  let nbErrors = 0;
+  const errors = [];
+
+  for (let i = 0; i < classes.length; i++) {
+    const classe = classes[i];
+    try {
+      // Valider les données obligatoires
+      if (!classe.id || classe.id.trim() === '') {
+        throw new Error('ID de classe obligatoire');
+      }
+      if (!classe.nom || classe.nom.trim() === '') {
+        throw new Error('Nom de classe obligatoire');
+      }
+
+      // Valider la couleur (format hexadécimal)
+      let couleur = classe.couleur || '#ffcccb';
+      if (!couleur.startsWith('#')) {
+        couleur = '#' + couleur;
+      }
+      if (!/^#[0-9A-Fa-f]{6}$/.test(couleur)) {
+        throw new Error('Couleur doit être au format hexadécimal (ex: #ffcccb)');
+      }
+
+      // Valider l'ordre
+      const ordre = parseInt(classe.ordre) || 0;
+      if (ordre < 0 || ordre > 100) {
+        throw new Error('Ordre doit être entre 0 et 100');
+      }
+
+      // Vérifier si la classe existe déjà
+      const existingClasse = await query(
+        'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
+        [classe.id.trim(), planningId]
+      );
+
+      if (existingClasse.rows.length > 0) {
+        throw new Error('Une classe avec cet ID existe déjà');
+      }
+
+      // Insérer la classe
+      await query(
+        'INSERT INTO classes (id, planning_id, nom, couleur, ordre, description) VALUES ($1, $2, $3, $4, $5, $6)',
+        [
+          classe.id.trim(), 
+          planningId, 
+          classe.nom.trim(), 
+          couleur, 
+          ordre, 
+          classe.description || null
+        ]
+      );
+
+      nbSuccess++;
+    } catch (error) {
+      nbErrors++;
+      errors.push({
+        ligne: i + 2, // +2 car ligne 1 = headers
+        classe: classe.nom || classe.id || 'ID/Nom manquant',
+        erreur: error.message
+      });
+    }
+  }
+
+  return {
+    total_lines: classes.length,
+    success: nbSuccess,
+    errors: nbErrors,
+    error_details: errors
+  };
+}
