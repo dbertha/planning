@@ -3,10 +3,15 @@ import FamillesManager from './FamillesManager';
 import ClassesManager from './ClassesManager';
 import SemainesManager from './SemainesManager';
 import LoginModal from './LoginModal';
+import { PlanningManager } from './PlanningManager';
+import { WeekCreator } from './WeekCreator';
+import ExclusionsManager from './ExclusionsManager';
+import SMSManager from './SMSManager';
 
-function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshData }) {
-  const [activeTab, setActiveTab] = useState('familles');
+function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshData, toggleSemainePublication, planningData, sessionToken }) {
+  const [activeTab, setActiveTab] = useState('planning');
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSMSManager, setShowSMSManager] = useState(false);
 
   const handleLogin = async (password) => {
     const result = await loginAdmin(password);
@@ -17,9 +22,12 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
   };
 
   const tabs = [
+    { id: 'planning', label: '📋 Plannings', component: 'PlanningTab' },
     { id: 'familles', label: '👥 Familles', component: FamillesManager },
     { id: 'classes', label: '🏠 Classes', component: ClassesManager },
-    { id: 'semaines', label: '📅 Semaines', component: SemainesManager }
+    { id: 'semaines', label: '📅 Semaines', component: SemainesManager },
+    { id: 'exclusions', label: '🚫 Exclusions', component: ExclusionsManager },
+    { id: 'sms', label: '📱 SMS', component: 'SMSTab' }
   ];
 
   if (!isAdmin) {
@@ -75,12 +83,73 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
       </div>
 
       <div className="admin-content">
-        {ActiveComponent && (
-          <ActiveComponent 
+        {activeTab === 'planning' && (
+          <>
+            <PlanningManager 
+              currentPlanning={planningData?.planning}
+              isAdmin={isAdmin}
+            />
+            <WeekCreator
+              token={token}
+              isAdmin={isAdmin}
+              sessionToken={sessionToken}
+              onWeekCreated={refreshData}
+            />
+          </>
+        )}
+        {activeTab === 'familles' && (
+          <FamillesManager 
             token={token}
             canEdit={canEdit}
             refreshData={refreshData}
           />
+        )}
+        {activeTab === 'classes' && (
+          <ClassesManager 
+            token={token}
+            canEdit={canEdit}
+            refreshData={refreshData}
+          />
+        )}
+        {activeTab === 'semaines' && (
+          <SemainesManager 
+            token={token}
+            canEdit={canEdit}
+            refreshData={refreshData}
+            toggleSemainePublication={toggleSemainePublication}
+          />
+        )}
+        {activeTab === 'exclusions' && (
+          <ExclusionsManager 
+            token={token}
+            canEdit={canEdit}
+            refreshData={refreshData}
+          />
+        )}
+        {activeTab === 'sms' && (
+          <div className="sms-tab">
+            <div className="tab-header">
+              <h3>📱 Communication SMS</h3>
+              <p>Envoyez des SMS aux familles pour les informer des affectations et rappels.</p>
+            </div>
+            <button 
+              onClick={() => setShowSMSManager(true)}
+              className="btn btn-primary"
+              style={{ marginTop: '1rem' }}
+            >
+              📱 Ouvrir le gestionnaire SMS
+            </button>
+            
+            {showSMSManager && (
+              <SMSManager
+                currentPlanning={planningData?.planning}
+                adminSession={sessionToken}
+                semaines={planningData?.semaines || []}
+                familles={planningData?.familles || []}
+                onClose={() => setShowSMSManager(false)}
+              />
+            )}
+          </div>
         )}
       </div>
 

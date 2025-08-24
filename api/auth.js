@@ -139,7 +139,7 @@ async function handlePost(req, res) {
 
       case 'create_planning':
         // Créer un nouveau planning (avec ou sans mot de passe admin)
-        const { name, description, year, adminPassword } = data;
+        const { name, description, year, adminPassword, customToken } = data;
         
         if (!name) {
           return res.status(400).json({ error: 'Nom du planning requis' });
@@ -149,7 +149,8 @@ async function handlePost(req, res) {
           name, 
           description, 
           parseInt(year) || new Date().getFullYear(),
-          adminPassword
+          adminPassword,
+          customToken
         );
 
         // Si un mot de passe admin est fourni, créer automatiquement une session
