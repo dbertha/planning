@@ -7,6 +7,7 @@ import { PlanningManager } from './PlanningManager';
 import { WeekCreator } from './WeekCreator';
 import ExclusionsManager from './ExclusionsManager';
 import SMSManager from './SMSManager';
+import ScheduledSMSManager from './ScheduledSMSManager';
 
 function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshData, toggleSemainePublication, planningData, sessionToken }) {
   const [activeTab, setActiveTab] = useState('planning');
@@ -27,7 +28,8 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
     { id: 'classes', label: '🏠 Classes', component: ClassesManager },
     { id: 'semaines', label: '📅 Semaines', component: SemainesManager },
     { id: 'exclusions', label: '🚫 Exclusions', component: ExclusionsManager },
-    { id: 'sms', label: '📱 SMS', component: 'SMSTab' }
+    { id: 'sms', label: '📱 SMS', component: 'SMSTab' },
+    { id: 'scheduled-sms', label: '⏰ SMS Planifiés', component: ScheduledSMSManager }
   ];
 
   if (!isAdmin) {
@@ -102,6 +104,7 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
             token={token}
             canEdit={canEdit}
             refreshData={refreshData}
+            sessionToken={sessionToken}
           />
         )}
         {activeTab === 'classes' && (
@@ -150,6 +153,13 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
               />
             )}
           </div>
+        )}
+        {activeTab === 'scheduled-sms' && (
+          <ScheduledSMSManager 
+            token={token}
+            sessionToken={sessionToken}
+            canEdit={canEdit}
+          />
         )}
       </div>
 

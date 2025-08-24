@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import './DeleteConfirmModal.css'; // Réutiliser les styles des modales
 
 const SMSManager = ({ 
   currentPlanning, 

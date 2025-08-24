@@ -7,6 +7,7 @@
 
 import { validateTokenAndGetPlanning } from './db.js';
 import { query } from './db.js';
+import { createScheduledSMS, getScheduledSMSList, updateScheduledSMS, deleteScheduledSMS, getScheduledSMSToExecute } from './db.js';
 
 const SPRYNG_BASE_URL = 'https://rest.spryngsms.com/v1';
 const TWILIO_BASE_URL = 'https://api.twilio.com/2010-04-01';
@@ -462,7 +463,7 @@ class TwilioSMSService {
 /**
  * Factory pour créer le service SMS approprié
  */
-function createSMSService() {
+export function createSMSService() {
   const provider = SMS_CONFIG.provider.toLowerCase();
   
   console.log(`📱 Initialisation du service SMS: ${provider}`);
@@ -563,6 +564,18 @@ async function handlePost(req, res) {
         
       case 'get_templates':
         return res.json({ templates: SMS_TEMPLATES });
+
+      case 'list_scheduled':
+        return await listScheduledSMS(res, planning);
+        
+      case 'create_scheduled':
+        return await createScheduledSMSHandler(res, planning, data);
+        
+      case 'update_scheduled':
+        return await updateScheduledSMSHandler(res, data);
+        
+      case 'delete_scheduled':
+        return await deleteScheduledSMSHandler(res, data);
         
       default:
         return res.status(400).json({ error: 'Action inconnue' });
@@ -861,6 +874,80 @@ async function testConnection(res, smsService) {
     });
   }
 }
+/**
+ * Handlers pour les SMS planifiés
+ */
+async function listScheduledSMS(res, planning) {
+  try {
+    const scheduledSMS = await getScheduledSMSList(planning.id);
+    
+    res.json({
+      success: true,
+      data: scheduledSMS
+    });
+  } catch (error) {
+    console.error('❌ Erreur récupération SMS planifiés:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la récupération des SMS planifiés'
+    });
+  }
+}
+
+async function createScheduledSMSHandler(res, planning, data) {
+  try {
+    const scheduledSMS = await createScheduledSMS(planning.id, data);
+    
+    res.json({
+      success: true,
+      data: scheduledSMS,
+      message: 'SMS planifié créé avec succès'
+    });
+  } catch (error) {
+    console.error('❌ Erreur création SMS planifié:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la création du SMS planifié'
+    });
+  }
+}
+
+async function updateScheduledSMSHandler(res, data) {
+  try {
+    const { id, ...updateData } = data;
+    const scheduledSMS = await updateScheduledSMS(id, updateData);
+    
+    res.json({
+      success: true,
+      data: scheduledSMS,
+      message: 'SMS planifié mis à jour avec succès'
+    });
+  } catch (error) {
+    console.error('❌ Erreur modification SMS planifié:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la modification du SMS planifié'
+    });
+  }
+}
+
+async function deleteScheduledSMSHandler(res, data) {
+  try {
+    await deleteScheduledSMS(data.id);
+    
+    res.json({
+      success: true,
+      message: 'SMS planifié supprimé avec succès'
+    });
+  } catch (error) {
+    console.error('❌ Erreur suppression SMS planifié:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la suppression du SMS planifié'
+    });
+  }
+}
+
 /**
  * Point d'entrée principal
  */

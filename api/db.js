@@ -100,6 +100,39 @@ export const initDatabase = async () => {
       );
     `);
 
+    // Table des SMS planifiés
+    await query(`
+      CREATE TABLE IF NOT EXISTS scheduled_sms (
+        id SERIAL PRIMARY KEY,
+        planning_id INTEGER REFERENCES plannings(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        message_template TEXT NOT NULL,
+        day_of_week INTEGER NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6), -- 0=Dimanche, 1=Lundi, ... 6=Samedi
+        hour INTEGER NOT NULL CHECK (hour >= 0 AND hour <= 23),
+        minute INTEGER DEFAULT 0 CHECK (minute >= 0 AND minute <= 59),
+        target_type VARCHAR(20) DEFAULT 'current_week', -- 'current_week', 'all_active', 'specific_families'
+        is_active BOOLEAN DEFAULT true,
+        last_executed_date DATE, -- Pour éviter les doublons
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Table pour éviter les doublons d'exécution
+    await query(`
+      CREATE TABLE IF NOT EXISTS sms_execution_log (
+        id SERIAL PRIMARY KEY,
+        scheduled_sms_id INTEGER REFERENCES scheduled_sms(id) ON DELETE CASCADE,
+        execution_date DATE NOT NULL,
+        execution_time TIME NOT NULL,
+        success BOOLEAN NOT NULL,
+        recipients_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(scheduled_sms_id, execution_date, execution_time)
+      );
+    `);
+
     // Table des semaines (avec statut de publication)
     await query(`
       CREATE TABLE IF NOT EXISTS semaines (
@@ -755,4 +788,97 @@ function formatDateForDisplay(date) {
     day: 'numeric',
     month: 'short'
   });
-} 
+}
+
+// **Fonctions pour les SMS planifiés**
+
+export const createScheduledSMS = async (planningId, data) => {
+  try {
+    const { name, description, message_template, day_of_week, hour, minute, target_type } = data;
+    
+    const result = await query(
+      'INSERT INTO scheduled_sms (planning_id, name, description, message_template, day_of_week, hour, minute, target_type) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [planningId, name, description, message_template, day_of_week, hour, minute || 0, target_type || 'current_week']
+    );
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('Erreur création SMS planifié:', error);
+    throw error;
+  }
+};
+
+export const getScheduledSMSList = async (planningId) => {
+  try {
+    const result = await query(
+      'SELECT * FROM scheduled_sms WHERE planning_id = $1 ORDER BY day_of_week, hour, minute',
+      [planningId]
+    );
+    
+    return result.rows;
+  } catch (error) {
+    console.error('Erreur récupération SMS planifiés:', error);
+    throw error;
+  }
+};
+
+export const updateScheduledSMS = async (smsId, data) => {
+  try {
+    const { name, description, message_template, day_of_week, hour, minute, target_type, is_active } = data;
+    
+    const result = await query(
+      'UPDATE scheduled_sms SET name = $1, description = $2, message_template = $3, day_of_week = $4, hour = $5, minute = $6, target_type = $7, is_active = $8, updated_at = CURRENT_TIMESTAMP WHERE id = $9 RETURNING *',
+      [name, description, message_template, day_of_week, hour, minute, target_type, is_active, smsId]
+    );
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('Erreur modification SMS planifié:', error);
+    throw error;
+  }
+};
+
+export const deleteScheduledSMS = async (smsId) => {
+  try {
+    await query('DELETE FROM scheduled_sms WHERE id = $1', [smsId]);
+    return { success: true };
+  } catch (error) {
+    console.error('Erreur suppression SMS planifié:', error);
+    throw error;
+  }
+};
+
+export const getScheduledSMSToExecute = async () => {
+  try {
+    // Obtenir l'heure actuelle en fuseau horaire de Bruxelles
+    const nowInBrussels = new Date().toLocaleString("en-US", {timeZone: "Europe/Brussels"});
+    const brusselsTime = new Date(nowInBrussels);
+    
+    const currentDayOfWeek = brusselsTime.getDay(); // 0=Dimanche, 1=Lundi, etc.
+    const currentHour = brusselsTime.getHours();
+    const currentMinute = brusselsTime.getMinutes();
+    
+    console.log(`🕐 Vérification SMS planifiés - Heure Bruxelles: ${brusselsTime.toLocaleString('fr-BE')} (Jour: ${currentDayOfWeek}, H: ${currentHour}, M: ${currentMinute})`);
+    
+    // Chercher les SMS à envoyer maintenant (avec une tolérance de 5 minutes pour les services externes)
+    const result = await query(`
+      SELECT s.*, p.name as planning_name, p.token as planning_token
+      FROM scheduled_sms s
+      JOIN plannings p ON s.planning_id = p.id
+      WHERE s.is_active = true 
+        AND s.day_of_week = $1 
+        AND s.hour = $2 
+        AND s.minute BETWEEN $3 AND $4
+        AND p.is_active = true
+    `, [currentDayOfWeek, currentHour, Math.max(0, currentMinute - 5), currentMinute]);
+    
+    if (result.rows.length > 0) {
+      console.log(`📱 ${result.rows.length} SMS planifié(s) à exécuter trouvé(s)`);
+    }
+    
+    return result.rows;
+  } catch (error) {
+    console.error('Erreur récupération SMS à exécuter:', error);
+    throw error;
+  }
+}; 

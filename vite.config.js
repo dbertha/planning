@@ -3,6 +3,36 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Séparer React et ReactDOM
+          'react-vendor': ['react', 'react-dom'],
+          // Séparer les composants admin (gros)
+          'admin-components': [
+            './src/components/AdminPanel.jsx',
+            './src/components/SMSManager.jsx',
+            './src/components/ScheduledSMSManager.jsx',
+            './src/components/FamillesManager.jsx',
+            './src/components/ClassesManager.jsx',
+            './src/components/SemainesManager.jsx',
+            './src/components/PlanningManager.jsx',
+            './src/components/ExclusionsManager.jsx'
+          ],
+          // Séparer les composants de planning (moyens)
+          'planning-components': [
+            './src/components/Planning.jsx',
+            './src/components/PlanningGrid.jsx',
+            './src/components/PlanningHeader.jsx',
+            './src/components/WeekRow.jsx',
+            './src/components/AffectationCell.jsx'
+          ]
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000  // Augmenter la limite d'avertissement
+  },
   server: {
     port: 5173,
     proxy: {

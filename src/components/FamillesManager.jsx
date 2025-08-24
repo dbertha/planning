@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ExclusionsManager from './ExclusionsManager.jsx';
 
-function FamillesManager({ token, canEdit, refreshData }) {
+function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
   const [familles, setFamilles] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -10,6 +10,10 @@ function FamillesManager({ token, canEdit, refreshData }) {
   const [importFile, setImportFile] = useState(null);
   const [importResult, setImportResult] = useState(null);
   const [selectedFamilleForExclusions, setSelectedFamilleForExclusions] = useState(null);
+  const [smsSending, setSmsSending] = useState(null);
+  const [showSMSModal, setShowSMSModal] = useState(false);
+  const [selectedFamilleForSMS, setSelectedFamilleForSMS] = useState(null);
+  const [smsMessage, setSmsMessage] = useState('');
 
   // Formulaire pour nouvelle famille
   const [newFamille, setNewFamille] = useState({
@@ -268,6 +272,107 @@ function FamillesManager({ token, canEdit, refreshData }) {
     }
   };
 
+  const handleSendSMSToFamille = (famille) => {
+    setSelectedFamilleForSMS(famille);
+    setSmsMessage(`Bonjour ${famille.nom}, `);
+    setShowSMSModal(true);
+  };
+
+  const handleSendSMS = async () => {
+    if (!smsMessage.trim()) {
+      setError('Le message SMS ne peut pas être vide');
+      return;
+    }
+
+    try {
+      setSmsSending(selectedFamilleForSMS.id);
+      
+      const response = await fetch('/api/sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': sessionToken
+        },
+        body: JSON.stringify({
+          token,
+          action: 'send_to_famille',
+          data: {
+            famille_id: selectedFamilleForSMS.id,
+            template_key: 'personnalise',
+            message_personnalise: smsMessage,
+            template_data: {
+              nom_famille: selectedFamilleForSMS.nom,
+              planning_name: 'Planning'
+            }
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erreur lors de l\'envoi du SMS');
+      }
+
+      alert(`SMS envoyé avec succès à ${selectedFamilleForSMS.nom} !`);
+      setShowSMSModal(false);
+      setSmsMessage('');
+      setSelectedFamilleForSMS(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSmsSending(null);
+    }
+  };
+
+  const handleSendSMSToAllFamilles = async () => {
+    const activeFamilles = familles.filter(f => f.is_active);
+    if (activeFamilles.length === 0) {
+      setError('Aucune famille active à contacter');
+      return;
+    }
+
+    const message = prompt(`Envoyer un SMS à ${activeFamilles.length} familles actives.\nMessage:`);
+    if (!message) return;
+
+    if (!window.confirm(`Confirmer l'envoi du SMS à ${activeFamilles.length} familles ?`)) return;
+
+    try {
+      setLoading(true);
+      
+      const response = await fetch('/api/sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': sessionToken
+        },
+        body: JSON.stringify({
+          token,
+          action: 'send_bulk',
+          data: {
+            template_key: 'personnalise',
+            message_personnalise: message,
+            template_data: {
+              planning_name: 'Planning'
+            }
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erreur lors de l\'envoi en masse');
+      }
+
+      alert(`SMS envoyés avec succès !\nEnvoyés: ${result.sent}\nErreurs: ${result.errors}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="familles-manager">
       <div className="manager-header">
@@ -278,6 +383,14 @@ function FamillesManager({ token, canEdit, refreshData }) {
           </button>
           <button onClick={() => setShowAddForm(!showAddForm)} className="btn btn-primary">
             ➕ Ajouter Famille
+          </button>
+          <button
+            onClick={handleSendSMSToAllFamilles}
+            className="btn btn-sms"
+            disabled={!canEdit || !sessionToken}
+            title="Envoyer un SMS à toutes les familles actives"
+          >
+            📱 SMS Global
           </button>
         </div>
       </div>
@@ -429,6 +542,14 @@ function FamillesManager({ token, canEdit, refreshData }) {
                   <h5>{famille.nom}</h5>
                   <div className="famille-actions">
                     <button
+                      onClick={() => handleSendSMSToFamille(famille)}
+                      className="sms-btn"
+                      disabled={!canEdit || !sessionToken || smsSending === famille.id}
+                      title="Envoyer un SMS à cette famille"
+                    >
+                      {smsSending === famille.id ? '⏳' : '📱'}
+                    </button>
+                    <button
                       onClick={() => setSelectedFamilleForExclusions(famille)}
                       className="exclusions-btn"
                       title="Gérer les contraintes (dates d'indisponibilité)"
@@ -493,6 +614,57 @@ function FamillesManager({ token, canEdit, refreshData }) {
             onClose={() => setSelectedFamilleForExclusions(null)}
           />
         </>
+      )}
+
+      {/* Modal SMS */}
+      {showSMSModal && selectedFamilleForSMS && (
+        <div className="modal-overlay" onClick={() => setShowSMSModal(false)}>
+          <div className="sms-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h4>📱 Envoyer SMS à {selectedFamilleForSMS.nom}</h4>
+              <button
+                onClick={() => setShowSMSModal(false)}
+                className="close-btn"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-content">
+              <div className="famille-contact-info">
+                <p><strong>📞 Téléphone:</strong> {selectedFamilleForSMS.telephone}</p>
+                {selectedFamilleForSMS.email && (
+                  <p><strong>📧 Email:</strong> {selectedFamilleForSMS.email}</p>
+                )}
+              </div>
+              <textarea
+                value={smsMessage}
+                onChange={(e) => setSmsMessage(e.target.value)}
+                placeholder="Tapez votre message SMS..."
+                rows={4}
+                maxLength={160}
+                className="sms-textarea"
+              />
+              <div className="sms-info">
+                <span>{smsMessage.length}/160 caractères</span>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={() => setShowSMSModal(false)}
+                className="btn btn-secondary"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSendSMS}
+                className="btn btn-primary"
+                disabled={!smsMessage.trim() || smsSending}
+              >
+                {smsSending ? '⏳ Envoi...' : '📱 Envoyer SMS'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <style jsx>{`
@@ -765,6 +937,119 @@ function FamillesManager({ token, canEdit, refreshData }) {
         .btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+        }
+
+        .btn-sms {
+          background: #17a2b8;
+          color: white;
+        }
+
+        .sms-btn {
+          background: #17a2b8;
+          color: white;
+          padding: 4px 8px;
+          border: none;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: background 0.2s;
+        }
+
+        .sms-btn:hover:not(:disabled) {
+          background: #138496;
+        }
+
+        .sms-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .sms-modal {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: white;
+          border-radius: 8px;
+          padding: 0;
+          min-width: 400px;
+          max-width: 500px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+          z-index: 1000;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h4 {
+          margin: 0;
+          color: #333;
+        }
+
+        .close-btn {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #666;
+          padding: 0;
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+        }
+
+        .close-btn:hover {
+          background: #f0f0f0;
+        }
+
+        .modal-content {
+          padding: 20px;
+        }
+
+        .famille-contact-info {
+          background: #f8f9fa;
+          padding: 15px;
+          border-radius: 5px;
+          margin-bottom: 15px;
+        }
+
+        .famille-contact-info p {
+          margin: 5px 0;
+          font-size: 14px;
+        }
+
+        .sms-textarea {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-family: inherit;
+          font-size: 14px;
+          resize: vertical;
+          min-height: 80px;
+        }
+
+        .sms-info {
+          font-size: 12px;
+          color: #666;
+          margin-top: 5px;
+          text-align: right;
+        }
+
+        .modal-actions {
+          padding: 20px;
+          border-top: 1px solid #eee;
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
         }
 
         .error-message {
