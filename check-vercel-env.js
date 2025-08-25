@@ -17,13 +17,6 @@ const requiredVars = {
     example: 'postgresql://user:pass@host:5432/db'
   },
   
-  // Sécurité (obligatoire)
-  'ADMIN_SALT': {
-    required: true,
-    description: 'Salt pour le hachage des mots de passe admin',
-    example: 'your_random_salt_string'
-  },
-  
   // Configuration SMS (obligatoire)
   'SMS_ENABLED': {
     required: true,
@@ -82,10 +75,10 @@ const requiredVars = {
     example: '0032497890341'
   },
   
-  // Administration (optionnel)
+  // Administration
   'DEFAULT_ADMIN_PASSWORD': {
-    required: false,
-    description: 'Mot de passe admin par défaut pour nouveaux plannings',
+    required: true,
+    description: 'Mot de passe admin global pour tous les plannings',
     example: 'admin123'
   }
 };
