@@ -296,6 +296,16 @@ async function handlePost(req, res) {
 
     switch (type) {
       case 'classe':
+        // Vérifier si la classe existe déjà
+        const existingClass = await query(
+          'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
+          [data.id, planning.id]
+        );
+        
+        if (existingClass.rows.length > 0) {
+          return res.status(400).json({ error: 'Une classe avec cet ID existe déjà dans ce planning' });
+        }
+        
         const classeResult = await query(
           'INSERT INTO classes (id, planning_id, nom, couleur, ordre, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
           [data.id, planning.id, data.nom, data.couleur, data.ordre || 0, data.description]
@@ -404,7 +414,14 @@ async function handlePost(req, res) {
     } else if (error.message.includes('ADMIN_REQUIRED')) {
       res.status(403).json({ error: 'Accès administrateur requis' });
     } else if (error.message.includes('duplicate key')) {
-      res.status(400).json({ error: 'Cette cellule est déjà occupée par une autre famille' });
+      // Analyser le type de contrainte duplicate key
+      if (error.message.includes('classes_pkey') || error.message.includes('classes') && error.message.includes('id')) {
+        res.status(400).json({ error: 'Une classe avec cet ID existe déjà dans ce planning' });
+      } else if (error.message.includes('affectations')) {
+        res.status(400).json({ error: 'Cette cellule est déjà occupée par une autre famille' });
+      } else {
+        res.status(400).json({ error: 'Cet élément existe déjà' });
+      }
     } else {
       res.status(500).json({ error: 'Erreur serveur' });
     }

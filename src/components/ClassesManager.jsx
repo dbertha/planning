@@ -212,7 +212,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
     }
   };
 
-  const generateClassesFromTemplate = () => {
+  const generateClassesFromTemplate = async () => {
     const template = [
       { id: 'A', nom: 'Partie A - Rez-de-chaussée', couleur: '#ffcccb', ordre: 1 },
       { id: 'B', nom: 'Partie B - Cuisine', couleur: '#ffd700', ordre: 2 },
@@ -221,38 +221,11 @@ function ClassesManager({ token, canEdit, refreshData }) {
       { id: 'E', nom: 'Partie E - Extérieur', couleur: '#87ceeb', ordre: 5 }
     ];
 
-    setClasses(template);
-    setShowAddForm(false);
-  };
-
-  const saveAllClasses = async () => {
     try {
       setLoading(true);
       
-      // Supprimer toutes les classes existantes
-      for (const classe of classes) {
-        if (classe.id) {
-          try {
-            await fetch('/api/planning', {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Admin-Session': localStorage.getItem('adminSessionToken')
-              },
-              body: JSON.stringify({
-                token,
-                type: 'classe',
-                id: classe.id
-              })
-            });
-          } catch (err) {
-            // Ignorer les erreurs de suppression
-          }
-        }
-      }
-
-      // Créer les nouvelles classes
-      for (const classe of classes) {
+      // Créer automatiquement toutes les classes par défaut
+      for (const classe of template) {
         await fetch('/api/planning', {
           method: 'POST',
           headers: {
@@ -268,7 +241,8 @@ function ClassesManager({ token, canEdit, refreshData }) {
       }
 
       await loadClasses();
-      // refreshData() supprimé pour éviter le rechargement complet
+      setShowAddForm(false);
+      setError(''); // Effacer les erreurs précédentes
     } catch (err) {
       setError(err.message);
     } finally {
@@ -276,13 +250,15 @@ function ClassesManager({ token, canEdit, refreshData }) {
     }
   };
 
+
+
   return (
     <div className="classes-manager">
       <div className="manager-header">
         <h3>🏠 Gestion des Classes</h3>
         <div className="header-actions">
-          <button onClick={generateClassesFromTemplate} className="btn btn-secondary">
-            📋 Classes par Défaut
+          <button onClick={generateClassesFromTemplate} className="btn btn-secondary" disabled={loading}>
+            {loading ? '💾 Création...' : '📋 Créer Classes par Défaut'}
           </button>
           <button onClick={() => setShowAddForm(!showAddForm)} className="btn btn-primary">
             ➕ Ajouter Classe
@@ -448,11 +424,6 @@ function ClassesManager({ token, canEdit, refreshData }) {
       <div className="classes-list">
         <div className="list-header">
           <h4>🏗️ Classes ({classes.length})</h4>
-          {classes.length > 0 && (
-            <button onClick={saveAllClasses} className="btn btn-success" disabled={loading}>
-              💾 Sauvegarder tout
-            </button>
-          )}
         </div>
 
         {loading ? (
