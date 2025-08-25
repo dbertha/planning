@@ -509,6 +509,7 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
 
     // 6. Algorithme de distribution équitable
     const affectationsToCreate = [];
+    const familiesAlreadyAssignedThisWeek = new Set(); // Track familles déjà assignées cette semaine
     
     for (const classe of availableClasses) {
       // Trouver les familles disponibles pour cette classe et cette période
@@ -520,12 +521,17 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
         fin
       );
 
-      if (availableFamilies.length === 0) {
+      // Filtrer les familles déjà assignées dans cette session d'auto-distribution
+      const trulyAvailableFamilies = availableFamilies.filter(famille => 
+        !familiesAlreadyAssignedThisWeek.has(famille.id)
+      );
+
+      if (trulyAvailableFamilies.length === 0) {
         continue;
       }
 
       // Enrichir avec les statistiques et calculer le score de priorité
-      const familiesWithScores = availableFamilies.map(famille => {
+      const familiesWithScores = trulyAvailableFamilies.map(famille => {
         const stats = famillesStats.find(s => s.id === famille.id) || {
           current_affectations: 0,
           percentage_completed: 0
@@ -563,6 +569,19 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
         semaine_id: semaineId,
         notes: `Attribution automatique (${selectedFamily.percentage_completed.toFixed(1)}% complété)`
       });
+
+      // ⚡ CRUCIAL : Marquer cette famille comme assignée pour cette semaine
+      familiesAlreadyAssignedThisWeek.add(selectedFamily.id);
+
+      // ⚡ CRUCIAL : Mettre à jour les stats de la famille sélectionnée
+      // pour éviter qu'elle soit re-sélectionnée pour les classes suivantes
+      const familleStats = famillesStats.find(s => s.id === selectedFamily.id);
+      if (familleStats) {
+        familleStats.current_affectations += 1;
+        // Recalculer le pourcentage en fonction du max possible
+        const maxPossible = selectedFamily.nb_nettoyage || 1;
+        familleStats.percentage_completed = (familleStats.current_affectations / maxPossible) * 100;
+      }
     }
 
     // 7. Créer les affectations en base

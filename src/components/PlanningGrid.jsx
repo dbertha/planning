@@ -3,9 +3,11 @@ import { WeekRow } from './WeekRow';
 import { useAffectations } from '../hooks/useAffectations';
 import { ConfirmationPopup } from './ConfirmationPopup';
 import { OverwriteConfirmModal } from './OverwriteConfirmModal';
+import { useToast } from './Toast';
 
-export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectation, onDeleteAffectation, onAutoDistribute }) {
+export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectation, onDeleteAffectation, onAutoDistribute, onTogglePublish }) {
   const { filteredAffectations, moveAffectation } = useAffectations(data, filters);
+  const toast = useToast();
   const [exchangeProposal, setExchangeProposal] = useState(null);
   const [overwriteModal, setOverwriteModal] = useState({ 
     isOpen: false, 
@@ -19,10 +21,49 @@ export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectat
     setExchangeProposal({ from, to });
   };
 
-  const handleConfirmExchange = () => {
-    // Ici, nous simulerons juste l'échange sans sauvegarder
-    console.log('Échange confirmé:', exchangeProposal);
-    setExchangeProposal(null);
+  const handleConfirmExchange = async () => {
+    if (!exchangeProposal || !canEdit) return;
+
+    try {
+      const { from, to } = exchangeProposal;
+      
+      // Données des deux affectations à échanger
+      const fromAffectation = from.affectation;
+      const toAffectation = to.affectation;
+      
+      console.log('🔄 Début de l\'échange:', {
+        from: `${fromAffectation.familleNom} (${fromAffectation.classeNom})`,
+        to: `${toAffectation.familleNom} (${toAffectation.classeNom})`
+      });
+
+      // Étape 1: Supprimer les deux affectations existantes
+      await onDeleteAffectation(fromAffectation.id);
+      await onDeleteAffectation(toAffectation.id);
+      
+      // Étape 2: Créer les nouvelles affectations avec familles échangées
+      await onCreateAffectation(
+        fromAffectation.familleId, 
+        toAffectation.classeId, 
+        toAffectation.semaineId,
+        `Échange avec ${toAffectation.familleNom}`
+      );
+      
+      await onCreateAffectation(
+        toAffectation.familleId, 
+        fromAffectation.classeId, 
+        fromAffectation.semaineId,
+        `Échange avec ${fromAffectation.familleNom}`
+      );
+      
+      console.log('✅ Échange réussi !');
+      toast.success(`Échange réussi ! ${fromAffectation.familleNom} ↔ ${toAffectation.familleNom}`);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'échange:', error);
+      toast.error(`Erreur lors de l'échange : ${error.message}`);
+    } finally {
+      setExchangeProposal(null);
+    }
   };
 
   const handleFamilleDrop = async (familleId, classeId, semaineId) => {
@@ -72,6 +113,7 @@ export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectat
           isAdmin={isAdmin}
           canEdit={canEdit}
           onAutoDistribute={onAutoDistribute}
+          onTogglePublish={onTogglePublish}
         />
       ))}
 

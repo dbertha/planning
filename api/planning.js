@@ -219,22 +219,53 @@ async function handleGet(req, res) {
           result = await query('SELECT * FROM familles WHERE planning_id = $1 AND is_active = true ORDER BY nom', [planning.id]);
           break;
         case 'affectations':
-          // Filtrer selon les semaines publiées pour les non-admin
-          let affectationsQuery = `
-            SELECT a.*, f.nom as famille_nom, c.nom as classe_nom, s.debut as semaine_debut, s.is_published
+          // Récupérer toutes les affectations avec données enrichies (même requête que le chargement initial)
+          const affectationsQuery = `
+            SELECT a.*, 
+                   f.nom as famille_nom, 
+                   f.telephone as famille_telephone,
+                   f.nb_nettoyage,
+                   f.classes_preferences,
+                   c.nom as classe_nom, 
+                   c.couleur as classe_couleur,
+                   s.debut, s.fin, s.type as semaine_type, s.description as semaine_description,
+                   s.is_published, s.published_at,
+                   CASE 
+                     WHEN a.classe_id = ANY(f.classes_preferences) THEN 'Classe préférée'
+                     ELSE 'Assignation normale'
+                   END as preference_description,
+                   ROW_NUMBER() OVER (PARTITION BY a.famille_id ORDER BY s.debut, c.ordre, c.id) as nettoyage_numero
             FROM affectations a
             LEFT JOIN familles f ON a.famille_id = f.id
             LEFT JOIN classes c ON a.classe_id = c.id AND a.planning_id = c.planning_id
             LEFT JOIN semaines s ON a.semaine_id = s.id AND a.planning_id = s.planning_id
-            WHERE a.planning_id = $1`;
+            WHERE a.planning_id = $1
+            ORDER BY s.debut, c.ordre, c.id
+          `;
           
-          if (!isAdmin) {
-            affectationsQuery += ' AND s.is_published = true';
-          }
+          const affectationsResult = await query(affectationsQuery, [planning.id]);
+          const affectations = affectationsResult.rows.map(row => ({
+            id: row.id,
+            familleId: row.famille_id,
+            classeId: row.classe_id,
+            semaineId: row.semaine_id,
+            notes: row.notes,
+            // Données enrichies pour l'affichage
+            familleNom: row.famille_nom,
+            familleTelephone: isAdmin ? row.famille_telephone : null, // Téléphone seulement pour admin
+            classeNom: row.classe_nom,
+            classeCouleur: row.classe_couleur,
+            semaineDebut: row.debut,
+            semaineFin: row.fin,
+            semaineType: row.semaine_type,
+            semaineDescription: row.semaine_description,
+            semainePublished: row.is_published,
+            semainePublishedAt: row.published_at,
+            preferenceDescription: row.preference_description,
+            numeroNettoyage: parseInt(row.nettoyage_numero) // Numéro chronologique du nettoyage
+          }));
           
-          affectationsQuery += ' ORDER BY s.debut, c.id';
-          result = await query(affectationsQuery, [planning.id]);
-          break;
+          return res.status(200).json(affectations);
         case 'stats':
           const stats = await query(`
             SELECT 

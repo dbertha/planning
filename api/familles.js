@@ -62,6 +62,21 @@ async function handleGet(req, res) {
         res.status(200).json(exclusions);
         break;
 
+      case 'get_all_exclusions':
+        // Récupérer toutes les exclusions du planning
+        const allExclusions = await query(`
+          SELECT 
+            fe.*,
+            f.nom as famille_nom
+          FROM familles_exclusions fe
+          JOIN familles f ON fe.famille_id = f.id
+          WHERE fe.planning_id = $1 AND f.is_active = true
+          ORDER BY fe.date_debut DESC, f.nom
+        `, [planning.id]);
+        
+        res.status(200).json(allExclusions.rows);
+        break;
+
       case 'template':
         // Générer un template CSV pour l'import
         const classes = await query(

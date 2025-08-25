@@ -5,7 +5,7 @@ import SemainesManager from './SemainesManager';
 import LoginModal from './LoginModal';
 import { PlanningManager } from './PlanningManager';
 import { WeekCreator } from './WeekCreator';
-import ExclusionsManager from './ExclusionsManager';
+import ExclusionsOverview from './ExclusionsOverview';
 import SMSManager from './SMSManager';
 import ScheduledSMSManager from './ScheduledSMSManager';
 
@@ -27,7 +27,7 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
     { id: 'familles', label: '👥 Familles', component: FamillesManager },
     { id: 'classes', label: '🏠 Classes', component: ClassesManager },
     { id: 'semaines', label: '📅 Semaines', component: SemainesManager },
-    { id: 'exclusions', label: '🚫 Exclusions', component: ExclusionsManager },
+    { id: 'exclusions', label: '🚫 Exclusions', component: ExclusionsOverview },
     { id: 'sms', label: '📱 SMS', component: 'SMSTab' },
     { id: 'scheduled-sms', label: '⏰ SMS Planifiés', component: ScheduledSMSManager }
   ];
@@ -123,10 +123,8 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
           />
         )}
         {activeTab === 'exclusions' && (
-          <ExclusionsManager 
+          <ExclusionsOverview 
             token={token}
-            canEdit={canEdit}
-            refreshData={refreshData}
           />
         )}
         {activeTab === 'sms' && (

@@ -7,7 +7,20 @@ export function AffectationCell({ classe, semaine, affectation, onMove, onFamill
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'affectation',
     item: { affectation, classe, semaine },
-    canDrag: isAdmin && affectation,
+    canDrag: () => {
+      const canDragResult = isAdmin && affectation;
+      // Debug: Log pour nouvelles affectations
+      if (affectation && affectation._refreshKey) {
+        console.log(`🔍 Nouvelle affectation draggable?`, {
+          id: affectation.id,
+          famille: affectation.familleNom,
+          canDrag: canDragResult,
+          isAdmin,
+          hasAffectation: !!affectation
+        });
+      }
+      return canDragResult;
+    },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),

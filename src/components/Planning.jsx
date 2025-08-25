@@ -312,6 +312,8 @@ export function Planning() {
         {data.familles && data.familles.length > 0 && (
           <FamiliesSidebar
             familles={data.familles}
+            affectations={data.affectations}
+            classes={data.classes}
             isAdmin={isAdmin}
             filters={filters}
             onFilterChange={setFilters}
@@ -345,6 +347,7 @@ export function Planning() {
                     onCreateAffectation={createAffectation}
                     onDeleteAffectation={deleteAffectation}
                     onAutoDistribute={autoDistributeWeek}
+                    onTogglePublish={toggleSemainePublication}
                   />
                 </div>
               </div>

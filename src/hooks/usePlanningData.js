@@ -321,8 +321,50 @@ export function usePlanningData(token) {
 
       const result = await response.json();
       
-      // Recharger les données pour voir les nouvelles affectations
-      await loadPlanningData();
+      // Mise à jour ciblée des affectations après auto-distribution
+      if (result.success) {
+        console.log('🔄 Rechargement des affectations seulement...');
+        
+        const headers = {};
+        if (authToken) {
+          headers['X-Admin-Session'] = authToken;
+        }
+        
+        const affectationsResponse = await fetch(`/api/planning?token=${token}&type=affectations`, {
+          headers
+        });
+        
+        if (affectationsResponse.ok) {
+          const newAffectations = await affectationsResponse.json();
+          console.log('📊 Nouvelles affectations:', newAffectations.length);
+          
+          // Force React à détecter le changement en créant un nouvel objet
+          setData(prevData => {
+            console.log('🔄 Ancien nombre d\'affectations:', prevData.affectations.length);
+            console.log('🔄 Nouveau nombre d\'affectations:', newAffectations.length);
+            
+            // Debug: comparer les structures
+            if (prevData.affectations.length > 0 && newAffectations.length > 0) {
+              console.log('🔍 Ancienne affectation (exemple):', Object.keys(prevData.affectations[0]));
+              console.log('🔍 Nouvelle affectation (exemple):', Object.keys(newAffectations[0]));
+            }
+            
+            // Remplacement direct avec force de re-render React
+            const newData = {
+              ...prevData,
+              affectations: newAffectations.map((aff, index) => ({
+                ...aff,
+                // Force React key change pour garantir re-render
+                _refreshKey: Date.now() + index
+              }))
+            };
+            
+            return newData;
+          });
+        } else {
+          console.error('❌ Erreur lors du rechargement des affectations:', affectationsResponse.status);
+        }
+      }
       
       return result;
     } catch (err) {

@@ -1,7 +1,19 @@
 import React, { useState } from 'react';
 import { useDrag } from 'react-dnd';
 
-function FamilleItem({ famille, isAdmin }) {
+function FamilleItem({ famille, isAdmin, currentAffectations, classes }) {
+  // Calculer les noms des classes préférées
+  const getPreferencesNoms = () => {
+    if (!famille.classes_preferences || famille.classes_preferences.length === 0) return [];
+    return famille.classes_preferences
+      .map(classeId => {
+        const classe = classes.find(c => c.id === classeId);
+        return classe ? classe.nom : classeId;
+      })
+      .filter(Boolean);
+  };
+  
+  const preferencesNoms = getPreferencesNoms();
   const [{ isDragging }, drag] = useDrag({
     type: 'famille',
     item: { 
@@ -17,21 +29,28 @@ function FamilleItem({ famille, isAdmin }) {
     }),
   });
 
+  // Calculer l'état de progression
+  const isComplete = currentAffectations >= famille.nb_nettoyage;
+  const progressPercentage = Math.min((currentAffectations / famille.nb_nettoyage) * 100, 100);
+
   return (
     <div
       ref={isAdmin ? drag : null}
-      className={`famille-item ${isDragging ? 'dragging' : ''} ${!isAdmin ? 'readonly' : ''}`}
+      className={`famille-item ${isDragging ? 'dragging' : ''} ${!isAdmin ? 'readonly' : ''} ${isComplete ? 'complete' : ''}`}
       style={{ opacity: isDragging ? 0.5 : 1 }}
     >
       <div className="famille-nom">{famille.nom}</div>
       <div className="famille-details">
         <span className="telephone">📞 {famille.telephone}</span>
         <span className="nettoyages">🔢 {famille.nb_nettoyage}/an</span>
-        <span className="affectations">📊 {famille.nb_affectations || 0}</span>
+        <span className={`affectations ${isComplete ? 'complete' : ''}`}>
+          📊 {currentAffectations}/{famille.nb_nettoyage}
+          {isComplete && ' ✅'}
+        </span>
       </div>
-      {famille.preferences_noms && famille.preferences_noms.length > 0 && (
+      {preferencesNoms && preferencesNoms.length > 0 && (
         <div className="preferences">
-          💚 {famille.preferences_noms.join(', ')}
+          💚 {preferencesNoms.join(', ')}
         </div>
       )}
       {isAdmin && (
@@ -43,8 +62,13 @@ function FamilleItem({ famille, isAdmin }) {
   );
 }
 
-export function FamiliesSidebar({ familles, isAdmin, filters, onFilterChange }) {
+export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filters, onFilterChange }) {
   const [collapsed, setCollapsed] = useState(false);
+
+  // Calculer le nombre d'affectations actuelles pour chaque famille
+  const getFamilleAffectationsCount = (familleId) => {
+    return affectations.filter(aff => aff.familleId === familleId).length;
+  };
 
   // Filtrer les familles selon la recherche
   const filteredFamilles = familles.filter(famille => {
@@ -55,12 +79,14 @@ export function FamiliesSidebar({ familles, isAdmin, filters, onFilterChange }) 
     return true;
   });
 
-  // Grouper par préférences si admin
+
+
+  // Grouper par préférences si admin (utiliser classes_preferences au lieu de preferences_noms)
   const famillesAvecPreferences = filteredFamilles.filter(f => 
-    f.preferences_noms && f.preferences_noms.length > 0
+    f.classes_preferences && f.classes_preferences.length > 0
   );
   const famillesSansPreferences = filteredFamilles.filter(f => 
-    !f.preferences_noms || f.preferences_noms.length === 0
+    !f.classes_preferences || f.classes_preferences.length === 0
   );
 
   return (
@@ -105,6 +131,8 @@ export function FamiliesSidebar({ familles, isAdmin, filters, onFilterChange }) 
                     key={famille.id} 
                     famille={famille} 
                     isAdmin={isAdmin}
+                    currentAffectations={getFamilleAffectationsCount(famille.id)}
+                    classes={classes}
                   />
                 ))}
               </div>
@@ -119,6 +147,8 @@ export function FamiliesSidebar({ familles, isAdmin, filters, onFilterChange }) 
                     key={famille.id} 
                     famille={famille} 
                     isAdmin={isAdmin}
+                    currentAffectations={getFamilleAffectationsCount(famille.id)}
+                    classes={classes}
                   />
                 ))}
               </div>
@@ -282,6 +312,22 @@ export function FamiliesSidebar({ familles, isAdmin, filters, onFilterChange }) 
 
         .empty-families p {
           margin: 4px 0;
+        }
+
+        /* Styles pour les familles complètes */
+        .famille-item.complete {
+          background: #d4edda;
+          border-color: #c3e6cb;
+        }
+
+        .famille-item.complete:hover {
+          background: #c8e6c9;
+          border-color: #a5d6a7;
+        }
+
+        .affectations.complete {
+          color: #155724;
+          font-weight: 600;
         }
 
                  @media (max-width: 768px) {
