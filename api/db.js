@@ -75,6 +75,18 @@ export const initDatabase = async () => {
       ALTER TABLE classes ADD COLUMN IF NOT EXISTS instructions_pdf_url TEXT;
     `);
 
+    // Migration: Ajouter contrainte d'unicité sur (nom, planning_id) pour familles
+    try {
+      await query(`
+        ALTER TABLE familles ADD CONSTRAINT familles_nom_planning_unique 
+        UNIQUE (nom, planning_id);
+      `);
+    } catch (error) {
+      if (error.code !== '42P07') { // Ignore error if constraint already exists
+        console.log('Migration: familles unique constraint already exists or error:', error.message);
+      }
+    }
+
     // Table des familles (téléphone obligatoire pour SMS)
     await query(`
       CREATE TABLE IF NOT EXISTS familles (
@@ -88,7 +100,8 @@ export const initDatabase = async () => {
         notes TEXT,
         is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(nom, planning_id) -- Éviter les doublons de famille par planning
       );
     `);
 

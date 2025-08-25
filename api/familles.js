@@ -252,6 +252,8 @@ async function handlePost(req, res) {
     console.error('Erreur POST familles:', error);
     if (error.message.includes('Token')) {
       res.status(401).json({ error: error.message });
+    } else if (error.message.includes('duplicate key') && error.message.includes('familles_nom_planning_unique')) {
+      res.status(400).json({ error: 'Une famille avec ce nom existe déjà dans ce planning' });
     } else {
       res.status(500).json({ error: 'Erreur serveur' });
     }
@@ -325,6 +327,8 @@ async function handlePut(req, res) {
     console.error('Erreur PUT familles:', error);
     if (error.message.includes('Token')) {
       res.status(401).json({ error: error.message });
+    } else if (error.message.includes('duplicate key') && error.message.includes('familles_nom_planning_unique')) {
+      res.status(400).json({ error: 'Une famille avec ce nom existe déjà dans ce planning' });
     } else {
       res.status(500).json({ error: 'Erreur serveur' });
     }
@@ -440,10 +444,17 @@ async function handleImport(planningId, familles, filename) {
       nbSuccess++;
     } catch (error) {
       nbErrors++;
+      let errorMessage = error.message;
+      
+      // Améliorer le message d'erreur pour les doublons
+      if (error.message.includes('duplicate key') && error.message.includes('familles_nom_planning_unique')) {
+        errorMessage = 'Famille déjà existante dans ce planning';
+      }
+      
       errors.push({
         ligne: i + 1,
         famille: famille.nom || 'Nom manquant',
-        erreur: error.message
+        erreur: errorMessage
       });
     }
   }

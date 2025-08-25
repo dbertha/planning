@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
+import { useToast } from './Toast';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmModal } from './ConfirmModal';
 
 export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showSwitchForm, setShowSwitchForm] = useState(false);
+  const toast = useToast();
+  const { confirm, confirmState, closeConfirm } = useConfirm();
   const [createData, setCreateData] = useState({
     name: '',
     description: '',
@@ -48,8 +53,18 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
       setShowCreateForm(false);
 
       // Proposer de basculer vers le nouveau planning
-      if (window.confirm(`Planning créé ! Voulez-vous basculer vers ce nouveau planning ?`)) {
+      const switchNow = await confirm({
+        title: 'Planning créé !',
+        message: `Le planning "${result.planning.name}" a été créé avec succès.\n\nVoulez-vous basculer vers ce nouveau planning maintenant ?`,
+        type: 'info',
+        confirmText: 'Basculer',
+        cancelText: 'Rester ici'
+      });
+
+      if (switchNow) {
         window.location.href = `?token=${result.planning.token}`;
+      } else {
+        toast.success('Planning créé avec succès ! Vous pouvez le retrouver dans la liste des plannings.');
       }
 
     } catch (err) {
@@ -458,6 +473,17 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
           }
         }
       `}</style>
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        type={confirmState.type}
+      />
     </div>
   );
 }

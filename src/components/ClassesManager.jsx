@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from './Toast';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmModal } from './ConfirmModal';
 
 function ClassesManager({ token, canEdit, refreshData }) {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const { confirm, confirmState, closeConfirm } = useConfirm();
   const [showAddForm, setShowAddForm] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [importResult, setImportResult] = useState(null);
@@ -95,9 +100,15 @@ function ClassesManager({ token, canEdit, refreshData }) {
   };
 
   const handleDeleteClasse = async (classeId) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer la classe ${classeId} ?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Supprimer la classe',
+      message: `Êtes-vous sûr de vouloir supprimer la classe "${classeId}" ?\n\nCette action est irréversible et supprimera toutes les affectations associées.`,
+      type: 'danger',
+      confirmText: 'Supprimer',
+      cancelText: 'Annuler'
+    });
+
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -120,9 +131,11 @@ function ClassesManager({ token, canEdit, refreshData }) {
       }
 
       await loadClasses();
+      toast.success(`Classe "${classeId}" supprimée avec succès`);
       // refreshData() supprimé pour éviter le rechargement complet
     } catch (err) {
       setError(err.message);
+      toast.error(`Erreur lors de la suppression: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -756,6 +769,17 @@ function ClassesManager({ token, canEdit, refreshData }) {
           padding: 20px;
         }
       `}</style>
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        type={confirmState.type}
+      />
     </div>
   );
 }

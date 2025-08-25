@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from './Toast';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmModal } from './ConfirmModal';
 
 export function ScheduledSMSManager({ token, sessionToken, canEdit }) {
   const [scheduledSMS, setScheduledSMS] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const toast = useToast();
+  const { confirm, confirmState, closeConfirm } = useConfirm();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingSMS, setEditingSMS] = useState(null);
 
@@ -142,7 +147,16 @@ export function ScheduledSMSManager({ token, sessionToken, canEdit }) {
   };
 
   const handleDelete = async (smsId) => {
-    if (!window.confirm('Supprimer ce SMS planifié ?')) return;
+    const sms = scheduledSMS.find(s => s.id === smsId);
+    const confirmed = await confirm({
+      title: 'Supprimer le SMS planifié',
+      message: `Supprimer le SMS "${sms?.name}" ?\n\nCe SMS ne sera plus envoyé automatiquement.`,
+      type: 'danger',
+      confirmText: 'Supprimer',
+      cancelText: 'Annuler'
+    });
+    
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -167,8 +181,10 @@ export function ScheduledSMSManager({ token, sessionToken, canEdit }) {
       }
 
       await loadScheduledSMS();
+      toast.success(`SMS "${sms?.name}" supprimé avec succès`);
     } catch (err) {
       setError(err.message);
+      toast.error(`Erreur lors de la suppression: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -678,6 +694,17 @@ export function ScheduledSMSManager({ token, sessionToken, canEdit }) {
           margin: 10px 0;
         }
       `}</style>
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        type={confirmState.type}
+      />
     </div>
   );
 }

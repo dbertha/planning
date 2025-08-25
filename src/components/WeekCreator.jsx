@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
+import { useToast } from './Toast';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmModal } from './ConfirmModal';
 
 export function WeekCreator({ token, isAdmin, sessionToken, onWeekCreated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const toast = useToast();
+  const { confirm, confirmState, closeConfirm } = useConfirm();
 
   const handleCreateNextWeek = async () => {
     if (!isAdmin || !sessionToken) {
@@ -55,10 +60,13 @@ export function WeekCreator({ token, isAdmin, sessionToken, onWeekCreated }) {
       return;
     }
 
-    const confirmed = window.confirm(
-      'Êtes-vous sûr de vouloir créer plusieurs semaines d\'affilée ? ' +
-      'Cela créera jusqu\'à 40 semaines consécutives de type "nettoyage".'
-    );
+    const confirmed = await confirm({
+      title: 'Créer plusieurs semaines',
+      message: 'Êtes-vous sûr de vouloir créer plusieurs semaines d\'affilée ?\n\nCela créera jusqu\'à 40 semaines consécutives de type "nettoyage".',
+      type: 'warning',
+      confirmText: 'Créer les semaines',
+      cancelText: 'Annuler'
+    });
 
     if (!confirmed) return;
 
@@ -273,6 +281,17 @@ export function WeekCreator({ token, isAdmin, sessionToken, onWeekCreated }) {
           }
         }
       `}</style>
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        type={confirmState.type}
+      />
     </div>
   );
 }

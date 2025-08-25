@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from './Toast';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmModal } from './ConfirmModal';
 
 const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) => {
   const [exclusions, setExclusions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
+  const { confirm, confirmState, closeConfirm } = useConfirm();
   const [newExclusion, setNewExclusion] = useState({
     date_debut: '',
     date_fin: '',
@@ -44,12 +49,12 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
     e.preventDefault();
     
     if (!newExclusion.date_debut || !newExclusion.date_fin) {
-      alert('Veuillez remplir les dates de début et fin');
+      toast.warning('Veuillez remplir les dates de début et fin');
       return;
     }
 
     if (new Date(newExclusion.date_debut) > new Date(newExclusion.date_fin)) {
-      alert('La date de début doit être antérieure à la date de fin');
+      toast.error('La date de début doit être antérieure à la date de fin');
       return;
     }
 
@@ -66,6 +71,7 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
 
       if (response.ok) {
         await loadExclusions();
+        toast.success('Exclusion ajoutée avec succès');
         setNewExclusion({
           date_debut: '',
           date_fin: '',
@@ -74,16 +80,24 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
         });
       } else {
         const error = await response.json();
-        alert(`Erreur: ${error.error}`);
+        toast.error(`Erreur: ${error.error}`);
       }
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de l\'ajout de l\'exclusion');
+      toast.error('Erreur lors de l\'ajout de l\'exclusion');
     }
   };
 
   const handleDelete = async (exclusionId) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette exclusion ?')) return;
+    const confirmed = await confirm({
+      title: 'Supprimer l\'exclusion',
+      message: 'Êtes-vous sûr de vouloir supprimer cette exclusion ?\n\nLa famille pourra à nouveau être assignée durant cette période.',
+      type: 'warning',
+      confirmText: 'Supprimer',
+      cancelText: 'Annuler'
+    });
+    
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`/api/familles/${exclusionId}?token=${planningToken}`, {
@@ -94,13 +108,14 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
 
       if (response.ok) {
         await loadExclusions();
+        toast.success('Exclusion supprimée avec succès');
       } else {
         const error = await response.json();
-        alert(`Erreur: ${error.error}`);
+        toast.error(`Erreur: ${error.error}`);
       }
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la suppression');
+      toast.error('Erreur lors de la suppression');
     }
   };
 
@@ -427,6 +442,17 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
           }
         }
       `}</style>
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        type={confirmState.type}
+      />
     </div>
   );
 };

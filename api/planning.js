@@ -417,6 +417,8 @@ async function handlePost(req, res) {
       // Analyser le type de contrainte duplicate key
       if (error.message.includes('classes_pkey') || error.message.includes('classes') && error.message.includes('id')) {
         res.status(400).json({ error: 'Une classe avec cet ID existe déjà dans ce planning' });
+      } else if (error.message.includes('familles_nom_planning_unique')) {
+        res.status(400).json({ error: 'Une famille avec ce nom existe déjà dans ce planning' });
       } else if (error.message.includes('affectations')) {
         res.status(400).json({ error: 'Cette cellule est déjà occupée par une autre famille' });
       } else {

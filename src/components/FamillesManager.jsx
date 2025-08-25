@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useToast } from './Toast';
+import { useConfirm } from '../hooks/useConfirm';
+import { ConfirmModal } from './ConfirmModal';
 import ExclusionsManager from './ExclusionsManager.jsx';
 
 function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
   const [familles, setFamilles] = useState([]);
   const [classes, setClasses] = useState([]);
+  const toast = useToast();
+  const { confirm, confirmState, closeConfirm } = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -209,9 +214,15 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
 
   const handleArchiveFamille = async (familleId) => {
     const famille = familles.find(f => f.id === familleId);
-    if (!confirm(`Archiver la famille "${famille?.nom}" ?\n\nLes affectations existantes seront conservées mais la famille ne pourra plus être assignée à de nouvelles tâches.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Archiver la famille',
+      message: `Archiver la famille "${famille?.nom}" ?\n\nLes affectations existantes seront conservées mais la famille ne pourra plus être assignée à de nouvelles tâches.`,
+      type: 'warning',
+      confirmText: 'Archiver',
+      cancelText: 'Annuler'
+    });
+    
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -314,7 +325,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         throw new Error(result.error || 'Erreur lors de l\'envoi du SMS');
       }
 
-      alert(`SMS envoyé avec succès à ${selectedFamilleForSMS.nom} !`);
+      toast.success(`SMS envoyé avec succès à ${selectedFamilleForSMS.nom} !`);
       setShowSMSModal(false);
       setSmsMessage('');
       setSelectedFamilleForSMS(null);
@@ -335,7 +346,15 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
     const message = prompt(`Envoyer un SMS à ${activeFamilles.length} familles actives.\nMessage:`);
     if (!message) return;
 
-    if (!window.confirm(`Confirmer l'envoi du SMS à ${activeFamilles.length} familles ?`)) return;
+    const confirmed = await confirm({
+      title: 'Envoi SMS groupé',
+      message: `Confirmer l'envoi du SMS à ${activeFamilles.length} familles ?\n\nLe message sera envoyé à toutes les familles actives du planning.`,
+      type: 'info',
+      confirmText: 'Envoyer',
+      cancelText: 'Annuler'
+    });
+    
+    if (!confirmed) return;
 
     try {
       setLoading(true);
@@ -365,7 +384,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         throw new Error(result.error || 'Erreur lors de l\'envoi en masse');
       }
 
-      alert(`SMS envoyés avec succès !\nEnvoyés: ${result.sent}\nErreurs: ${result.errors}`);
+      toast.success(`SMS envoyés avec succès !\nEnvoyés: ${result.sent} | Erreurs: ${result.errors}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1069,6 +1088,17 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
           padding: 20px;
         }
       `}</style>
+      
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText={confirmState.confirmText}
+        cancelText={confirmState.cancelText}
+        type={confirmState.type}
+      />
     </div>
   );
 }
