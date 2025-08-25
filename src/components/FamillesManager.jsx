@@ -379,7 +379,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         <h3>👥 Gestion des Familles</h3>
         <div className="header-actions">
           <button onClick={downloadTemplate} className="btn btn-secondary">
-            📥 Télécharger Template
+            📥 Télécharger Template CSV
           </button>
           <button onClick={() => setShowAddForm(!showAddForm)} className="btn btn-primary">
             ➕ Ajouter Famille

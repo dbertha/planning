@@ -282,7 +282,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
         <h3>🏠 Gestion des Classes</h3>
         <div className="header-actions">
           <button onClick={generateClassesFromTemplate} className="btn btn-secondary">
-            📋 Template Standard
+            📋 Classes par Défaut
           </button>
           <button onClick={() => setShowAddForm(!showAddForm)} className="btn btn-primary">
             ➕ Ajouter Classe
@@ -306,7 +306,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
             className="btn btn-outline"
             disabled={loading}
           >
-            📥 Télécharger Template
+            📥 Télécharger Template CSV
           </button>
           <input
             type="file"
@@ -509,7 +509,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
         {classes.length === 0 && !loading && (
           <div className="empty-state">
             <p>Aucune classe définie</p>
-            <p>Utilisez le template standard ou créez vos propres classes.</p>
+            <p>Utilisez les classes par défaut ou créez vos propres classes.</p>
           </div>
         )}
       </div>
