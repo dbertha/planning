@@ -42,12 +42,19 @@ export const initDatabase = async () => {
         name TEXT NOT NULL,
         description TEXT,
         year INTEGER,
-        admin_password_hash VARCHAR(64), -- Hash du mot de passe admin pour ce planning
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_active BOOLEAN DEFAULT true
       );
     `);
+
+    // Migration: Remove admin_password_hash column if it exists
+    try {
+      await query(`ALTER TABLE plannings DROP COLUMN IF EXISTS admin_password_hash;`);
+    } catch (error) {
+      // Ignore error if column doesn't exist
+      console.log('Migration: admin_password_hash column removal completed or already done');
+    }
 
     // Table des classes (zones de nettoyage)
     await query(`
@@ -236,10 +243,9 @@ export const validateTokenAndGetPlanning = async (token) => {
   return result.rows[0];
 };
 
-// Créer un nouveau planning avec mot de passe admin
-export const createPlanning = async (name, description, year, adminPassword, customToken) => {
+// Créer un nouveau planning (password is now global env var)
+export const createPlanning = async (name, description, year, customToken) => {
   const token = customToken || generateSecureToken();
-  const passwordHash = adminPassword ? hashPassword(adminPassword) : null;
   
   // Vérifier que le token personnalisé n'existe pas déjà
   if (customToken) {
@@ -250,23 +256,21 @@ export const createPlanning = async (name, description, year, adminPassword, cus
   }
   
   const result = await query(
-    'INSERT INTO plannings (token, name, description, annee_scolaire, admin_password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-    [token, name, description, year, passwordHash]
+    'INSERT INTO plannings (token, name, description, annee_scolaire) VALUES ($1, $2, $3, $4) RETURNING *',
+    [token, name, description, year]
   );
 
   return result.rows[0];
 };
 
-// Authentification admin
+// Authentification admin (global password from env var)
 export const authenticateAdmin = async (token, password) => {
   const planning = await validateTokenAndGetPlanning(token);
   
-  if (!planning.admin_password_hash) {
-    throw new Error('Aucun mot de passe admin configuré pour ce planning');
-  }
+  // Get global admin password from environment
+  const globalAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
   
-  const passwordHash = hashPassword(password);
-  if (passwordHash !== planning.admin_password_hash) {
+  if (password !== globalAdminPassword) {
     throw new Error('Mot de passe incorrect');
   }
   

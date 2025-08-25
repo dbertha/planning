@@ -104,7 +104,7 @@ async function runTests() {
           name: 'Planning Test',
           description: 'Planning pour les tests automatisés',
           year: 2024,
-          adminPassword: 'test123'
+          adminPassword: 'admin123'
         }
       }
     });

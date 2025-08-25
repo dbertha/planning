@@ -37,7 +37,7 @@ async function createTestPlanning() {
           name: 'Planning Test Import Classes',
           description: 'Test automatisé import classes',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: `import-classes-test-${Date.now()}`
         }
       })

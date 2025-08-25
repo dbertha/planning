@@ -26,7 +26,7 @@ async function testSimpleIntegration() {
           name: 'Planning Intégration Test',
           description: 'Test automatisé complet',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: 'integration-test-' + Date.now()
         }
       })
@@ -126,7 +126,7 @@ async function testWeekCreationSequence() {
           name: 'Planning Séquence Test',
           description: 'Test séquence de semaines',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: 'sequence-test-' + Date.now()
         }
       })

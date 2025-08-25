@@ -1,0 +1,8 @@
+id,nom,couleur,ordre,description
+PARTIE_A,Partie A,#ff6b6b,1,"Rez Canard + Salle Grenouille (TaiChi)"
+PARTIE_B,Partie B,#4ecdc4,2,"Chat + Cuisine Grenier"
+PARTIE_C,Partie C,#45b7d1,3,"1er étage Coq/Poule + local sieste"
+PARTIE_D,Partie D,#96ceb4,4,"1er étage Hirondelle (P3) et Forge (P6)"
+PARTIE_E,Partie E,#ffeaa7,5,"Rez Papillon (P1) / Vache (P5)"
+PARTIE_F,Partie F,#dda0dd,6,"1er étage Chien (P4)/Lapin (P2)"
+PARTIE_G,Partie G,#98d8c8,7,"Ecureuil + Cheval (grenier)"

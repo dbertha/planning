@@ -260,7 +260,7 @@ async function handleGet(req, res) {
             year: planning.annee_scolaire,
             created_at: planning.created_at,
             token: planning.token,
-            hasAdminPassword: !!planning.admin_password_hash,
+            hasAdminPassword: !!(process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'),
             isAdmin,
             canEdit: isAdmin
           });

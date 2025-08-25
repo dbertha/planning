@@ -103,7 +103,7 @@ erDiagram
     plannings {
         token string "Token sécurisé unique"
         name string "Nom du planning"
-        admin_password_hash string "Hash mot de passe admin"
+        // admin_password_hash removed - now uses global DEFAULT_ADMIN_PASSWORD env var
         is_active boolean
     }
     

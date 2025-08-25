@@ -34,7 +34,7 @@ async function createTestPlanning() {
           name: 'Planning Test Validation Classes',
           description: 'Test validation classes_preferences',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: `class-validation-test-${uniqueId}`
         }
       })

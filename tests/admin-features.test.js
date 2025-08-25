@@ -20,7 +20,7 @@ async function testPlanningCreation() {
           name: 'Planning Test Auto',
           description: 'Test automatisé',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: 'test-auto-' + Date.now()
         }
       })

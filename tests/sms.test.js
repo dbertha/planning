@@ -115,7 +115,7 @@ async function testSMSConfiguration() {
           name: 'Planning SMS Test',
           description: 'Planning pour tester les SMS',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: 'sms-test-' + Date.now()
         }
       }
@@ -201,7 +201,7 @@ async function testSMSSending() {
           name: 'Planning SMS Envoi Test',
           description: 'Test complet envoi SMS',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: 'sms-envoi-test-' + Date.now()
         }
       }
@@ -407,7 +407,7 @@ async function testSMSValidation() {
           name: 'Planning SMS Validation',
           description: 'Test validation SMS',
           year: 2024,
-          adminPassword: 'test123',
+          adminPassword: 'admin123',
           customToken: 'sms-validation-test-' + Date.now()
         }
       }

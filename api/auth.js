@@ -77,7 +77,8 @@ async function handleGet(req, res) {
         }
 
         const planning = await validateTokenAndGetPlanning(token);
-        const hasAdminPassword = !!planning.admin_password_hash;
+        // Admin password is now global from environment variable
+        const hasAdminPassword = !!(process.env.DEFAULT_ADMIN_PASSWORD || 'admin123');
 
         res.status(200).json({
           token: planning.token,
@@ -138,21 +139,17 @@ async function handlePost(req, res) {
         break;
 
       case 'create_planning':
-        // Créer un nouveau planning (avec ou sans mot de passe admin)
+        // Créer un nouveau planning
         const { name, description, year, adminPassword, customToken } = data;
         
         if (!name) {
           return res.status(400).json({ error: 'Nom du planning requis' });
         }
-
-        // Utiliser le mot de passe par défaut si pas fourni
-        const finalPassword = adminPassword || process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
         
         const newPlanning = await createPlanning(
           name, 
           description, 
           parseInt(year) || new Date().getFullYear(),
-          finalPassword,
           customToken
         );
 
