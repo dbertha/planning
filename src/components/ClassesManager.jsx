@@ -214,11 +214,13 @@ function ClassesManager({ token, canEdit, refreshData }) {
 
   const generateClassesFromTemplate = async () => {
     const template = [
-      { id: 'A', nom: 'Partie A - Rez-de-chaussée', couleur: '#ffcccb', ordre: 1 },
-      { id: 'B', nom: 'Partie B - Cuisine', couleur: '#ffd700', ordre: 2 },
-      { id: 'C', nom: 'Partie C - 1er étage', couleur: '#90ee90', ordre: 3 },
-      { id: 'D', nom: 'Partie D - 2ème étage', couleur: '#ff6961', ordre: 4 },
-      { id: 'E', nom: 'Partie E - Extérieur', couleur: '#87ceeb', ordre: 5 }
+      { id: 'PARTIE_A', nom: 'Partie A', couleur: '#ff6b6b', ordre: 1, description: 'Rez Canard + Salle Grenouille (TaiChi)' },
+      { id: 'PARTIE_B', nom: 'Partie B', couleur: '#4ecdc4', ordre: 2, description: 'Chat + Cuisine Grenier' },
+      { id: 'PARTIE_C', nom: 'Partie C', couleur: '#45b7d1', ordre: 3, description: '1er étage Coq/Poule + local sieste' },
+      { id: 'PARTIE_D', nom: 'Partie D', couleur: '#96ceb4', ordre: 4, description: '1er étage Hirondelle (P3) et Forge (P6)' },
+      { id: 'PARTIE_E', nom: 'Partie E', couleur: '#ffeaa7', ordre: 5, description: 'Rez Papillon (P1) / Vache (P5)' },
+      { id: 'PARTIE_F', nom: 'Partie F', couleur: '#dda0dd', ordre: 6, description: '1er étage Chien (P4)/Lapin (P2)' },
+      { id: 'PARTIE_G', nom: 'Partie G', couleur: '#98d8c8', ordre: 7, description: 'Ecureuil + Cheval (grenier)' }
     ];
 
     try {
