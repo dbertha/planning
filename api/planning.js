@@ -9,7 +9,8 @@ import {
   validateAdminSession,
   toggleSemainePublication,
   autoDistributeWeek,
-  createNextWeek
+  createNextWeek,
+  getFamilleExclusions
 } from './db.js';
 
 export default async function handler(req, res) {
@@ -116,10 +117,19 @@ async function handleGet(req, res) {
       
       const semainesResult = await query(semainesQuery, [planning.id]);
       
+      // Charger les familles (toujours nécessaires pour l'affichage des affectations)
       const famillesResult = await query(
         'SELECT * FROM familles WHERE planning_id = $1 AND is_active = true ORDER BY nom',
         [planning.id]
       );
+      
+      // Pour les admins, ajouter les exclusions aux familles
+      if (isAdmin && famillesResult.rows.length > 0) {
+        for (const famille of famillesResult.rows) {
+          const exclusions = await getFamilleExclusions(famille.id, planning.id);
+          famille.exclusions = exclusions;
+        }
+      }
       
       // Filtrer les affectations selon les semaines visibles
       const semainesIds = semainesResult.rows.map(s => s.id);

@@ -130,11 +130,34 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
                       const isOutOfPreference = isAdmin && famille && famille.classes_preferences && 
                         famille.classes_preferences.length > 0 && 
                         !famille.classes_preferences.includes(affectation.classeId);
+
+                      // Vérifier si l'affectation viole une exclusion temporelle de la famille
+                      const violatesExclusion = () => {
+                        if (!famille || !famille.exclusions || !semaine) {
+                          return false;
+                        }
+
+                        const semaineStart = new Date(semaine.debut);
+                        const semaineEnd = new Date(semaine.fin);
+
+                        return famille.exclusions.some(exclusion => {
+                          const exclusionStart = new Date(exclusion.date_debut);
+                          const exclusionEnd = new Date(exclusion.date_fin);
+                          
+                          return (
+                            (exclusionStart <= semaineStart && exclusionEnd >= semaineStart) ||
+                            (exclusionStart <= semaineEnd && exclusionEnd >= semaineEnd) ||
+                            (exclusionStart >= semaineStart && exclusionEnd <= semaineEnd)
+                          );
+                        });
+                      };
+
+                      const hasExclusionViolation = isAdmin && affectation && violatesExclusion();
                       
                       return (
                         <div 
                           key={affectation.id} 
-                          className={`assignment-item ${isOutOfPreference ? 'out-of-preference' : ''}`}
+                          className={`assignment-item ${isOutOfPreference ? 'out-of-preference' : ''} ${hasExclusionViolation ? 'exclusion-violation' : ''}`}
                           style={{ borderLeftColor: affectation.classeCouleur }}
                         >
                           <div className="assignment-header">

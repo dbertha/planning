@@ -22,7 +22,30 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
     return famille.classes_preferences.includes(classe.id);
   };
 
+  // Vérifier si l'affectation viole une exclusion temporelle de la famille
+  const violatesExclusion = () => {
+    if (!affectation || !famille || !famille.exclusions || !semaine) {
+      return false; // Pas d'info d'exclusion disponible
+    }
+
+    const semaineStart = new Date(semaine.debut);
+    const semaineEnd = new Date(semaine.fin);
+
+    return famille.exclusions.some(exclusion => {
+      const exclusionStart = new Date(exclusion.date_debut);
+      const exclusionEnd = new Date(exclusion.date_fin);
+      
+      // Vérifier s'il y a un chevauchement entre la semaine et l'exclusion
+      return (
+        (exclusionStart <= semaineStart && exclusionEnd >= semaineStart) ||
+        (exclusionStart <= semaineEnd && exclusionEnd >= semaineEnd) ||
+        (exclusionStart >= semaineStart && exclusionEnd <= semaineEnd)
+      );
+    });
+  };
+
   const isOutOfPreference = isAdmin && affectation && !isPreferredClass();
+  const hasExclusionViolation = isAdmin && affectation && violatesExclusion();
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'affectation',
@@ -95,7 +118,7 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           drop(node);
         }
       }}
-      className={`affectation-cell ${isDragging ? 'dragging' : ''} ${isOver && canDrop ? 'drop-target' : ''} ${!realAffectation && isAdmin ? 'droppable' : ''} ${affectation ? '' : 'filtered-hidden'} ${isOutOfPreference ? 'out-of-preference' : ''}`}
+              className={`affectation-cell ${isDragging ? 'dragging' : ''} ${isOver && canDrop ? 'drop-target' : ''} ${!realAffectation && isAdmin ? 'droppable' : ''} ${affectation ? '' : 'filtered-hidden'} ${isOutOfPreference ? 'out-of-preference' : ''} ${hasExclusionViolation ? 'exclusion-violation' : ''}`}
       style={{ 
         backgroundColor: classe.couleur + '40',
         opacity: isDragging ? 0.5 : 1,
@@ -181,6 +204,30 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
               )}
               {isAdmin && famille && (!famille.classes_preferences || famille.classes_preferences.length === 0) && (
                 <div style={{ fontStyle: 'italic', color: '#adb5bd', fontSize: '11px' }}>Aucune préférence définie</div>
+              )}
+              {isAdmin && hasExclusionViolation && famille && famille.exclusions && (
+                <div style={{ marginTop: '6px', fontSize: '11px', color: '#dc3545' }}>
+                  <strong style={{ color: '#c62828' }}>🚫 Exclusion temporelle :</strong>
+                  {famille.exclusions
+                    .filter(exclusion => {
+                      const exclusionStart = new Date(exclusion.date_debut);
+                      const exclusionEnd = new Date(exclusion.date_fin);
+                      const semaineStart = new Date(semaine.debut);
+                      const semaineEnd = new Date(semaine.fin);
+                      return (
+                        (exclusionStart <= semaineStart && exclusionEnd >= semaineStart) ||
+                        (exclusionStart <= semaineEnd && exclusionEnd >= semaineEnd) ||
+                        (exclusionStart >= semaineStart && exclusionEnd <= semaineEnd)
+                      );
+                    })
+                    .map((exclusion, index) => (
+                      <div key={index} style={{ marginTop: '2px', fontSize: '10px' }}>
+                        {new Date(exclusion.date_debut).toLocaleDateString()} - {new Date(exclusion.date_fin).toLocaleDateString()}
+                        {exclusion.type && ` (${exclusion.type})`}
+                      </div>
+                    ))
+                  }
+                </div>
               )}
             </div>,
             document.body
@@ -396,6 +443,57 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
         .affectation-cell.out-of-preference .famille-nom {
           color: #e8590c !important;
           font-weight: 600;
+        }
+
+        /* Styles pour les violations d'exclusion temporelle */
+        .affectation-cell.exclusion-violation {
+          border: 2px solid #dc3545 !important;
+          background: linear-gradient(135deg, 
+            rgba(220, 53, 69, 0.15), 
+            rgba(248, 215, 218, 0.15)
+          ) !important;
+          position: relative;
+        }
+
+        .affectation-cell.exclusion-violation::before {
+          content: "🚫";
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          font-size: 12px;
+          z-index: 10;
+          background: rgba(220, 53, 69, 0.9);
+          color: white;
+          border-radius: 50%;
+          width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+        }
+
+        .affectation-cell.exclusion-violation .famille-nom {
+          color: #c62828 !important;
+          font-weight: 600;
+        }
+
+        /* Cas spécial : violation d'exclusion ET hors préférences */
+        .affectation-cell.exclusion-violation.out-of-preference {
+          border: 2px solid #8e24aa !important;
+          background: linear-gradient(135deg, 
+            rgba(142, 36, 170, 0.15), 
+            rgba(225, 190, 231, 0.15)
+          ) !important;
+        }
+
+        .affectation-cell.exclusion-violation.out-of-preference::before {
+          content: "⛔";
+          background: rgba(142, 36, 170, 0.9);
+        }
+
+        .affectation-cell.exclusion-violation.out-of-preference .famille-nom {
+          color: #6a1b9a !important;
         }
 
         @media (max-width: 768px) {

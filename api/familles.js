@@ -50,7 +50,7 @@ async function handleGet(req, res) {
         // Vérifier si c'est un admin pour inclure les familles archivées
         const sessionToken = req.headers['x-admin-session'];
         const isAdmin = sessionToken ? (await validateAdminSession(sessionToken)).isAdmin : false;
-        const familles = await getFamillesWithPreferences(planning.id, isAdmin);
+        const familles = await getFamillesWithPreferences(planning.id, isAdmin, isAdmin);
         res.status(200).json(familles);
         break;
 

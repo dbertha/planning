@@ -329,7 +329,7 @@ export const cleanExpiredSessions = async () => {
 };
 
 // Fonctions utilitaires pour les familles avec préférences et exclusions
-export const getFamillesWithPreferences = async (planningId, includeArchived = false) => {
+export const getFamillesWithPreferences = async (planningId, includeArchived = false, includeExclusions = false) => {
   let whereClause = 'WHERE f.planning_id = $1';
   if (!includeArchived) {
     whereClause += ' AND f.is_active = true';
@@ -351,6 +351,14 @@ export const getFamillesWithPreferences = async (planningId, includeArchived = f
     GROUP BY f.id
     ORDER BY f.is_active DESC, f.nom
   `, [planningId]);
+  
+  // Si includeExclusions est true, récupérer les exclusions pour chaque famille
+  if (includeExclusions) {
+    for (const famille of result.rows) {
+      const exclusions = await getFamilleExclusions(famille.id, planningId);
+      famille.exclusions = exclusions;
+    }
+  }
   
   return result.rows;
 };
