@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { WeekCreator } from './WeekCreator';
 
-function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication }) {
+function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, toggleSemainePublication, sessionToken }) {
   const [semaines, setSemaines] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -101,7 +102,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
       });
       setShowAddForm(false);
       await loadSemaines();
-      // refreshData() supprimé pour éviter le rechargement complet
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
     } catch (err) {
       setError(err.message);
     } finally {
@@ -240,7 +241,7 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
       });
       setShowBulkForm(false);
       await loadSemaines();
-      // refreshData() supprimé pour éviter le rechargement complet
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
     } catch (err) {
       setError(err.message);
     } finally {
@@ -264,6 +265,17 @@ function SemainesManager({ token, canEdit, refreshData, toggleSemainePublication
           </button>
         </div>
       </div>
+
+      {/* Création rapide de semaines */}
+      <WeekCreator
+        token={token}
+        isAdmin={canEdit}
+        sessionToken={sessionToken}
+        onWeekCreated={(newWeek) => {
+          loadSemaines(); // Recharger la liste des semaines
+          refreshPlanningGrid(); // Recharger seulement la grille de planning
+        }}
+      />
 
       {error && (
         <div className="error-message">

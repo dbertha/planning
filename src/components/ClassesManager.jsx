@@ -3,7 +3,7 @@ import { useToast } from './Toast';
 import { useConfirm } from '../hooks/useConfirm';
 import { ConfirmModal } from './ConfirmModal';
 
-function ClassesManager({ token, canEdit, refreshData }) {
+function ClassesManager({ token, canEdit, refreshData, refreshPlanningGrid }) {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -92,7 +92,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
       });
       setShowAddForm(false);
       await loadClasses();
-      // refreshData() supprimé pour éviter le rechargement complet
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
     } catch (err) {
       setError(err.message);
     } finally {
@@ -141,6 +141,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
 
       setEditingClasse(null);
       await loadClasses();
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
       toast.success(`Classe "${editingClasse.id}" modifiée avec succès`);
     } catch (err) {
       setError(err.message);
@@ -187,7 +188,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
 
       await loadClasses();
       toast.success(`Classe "${classeId}" supprimée avec succès`);
-      // refreshData() supprimé pour éviter le rechargement complet
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
     } catch (err) {
       setError(err.message);
       toast.error(`Erreur lors de la suppression: ${err.message}`);
@@ -251,6 +252,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
       setImportResult(result);
       setImportFile(null);
       await loadClasses();
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
     } catch (err) {
       setError(err.message);
     } finally {
@@ -311,6 +313,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
       }
 
       await loadClasses();
+      refreshPlanningGrid(); // Recharger seulement la grille de planning
       setShowAddForm(false);
       setError(''); // Effacer les erreurs précédentes
     } catch (err) {

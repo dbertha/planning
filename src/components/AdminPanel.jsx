@@ -4,12 +4,11 @@ import ClassesManager from './ClassesManager';
 import SemainesManager from './SemainesManager';
 import LoginModal from './LoginModal';
 import { PlanningManager } from './PlanningManager';
-import { WeekCreator } from './WeekCreator';
 import ExclusionsOverview from './ExclusionsOverview';
 import SMSManager from './SMSManager';
 import ScheduledSMSManager from './ScheduledSMSManager';
 
-function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshData, toggleSemainePublication, planningData, sessionToken }) {
+function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshData, refreshPlanningGrid, toggleSemainePublication, planningData, sessionToken }) {
   const [activeTab, setActiveTab] = useState('planning');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSMSManager, setShowSMSManager] = useState(false);
@@ -31,7 +30,7 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
     { id: 'sms', label: '📱 SMS', component: 'SMSTab' },
     { id: 'scheduled-sms', label: '⏰ SMS Planifiés', component: ScheduledSMSManager }
   ];
-
+  refreshData
   if (!isAdmin) {
     return (
       <div className="admin-panel">
@@ -91,12 +90,6 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
               currentPlanning={planningData?.planning}
               isAdmin={isAdmin}
             />
-            <WeekCreator
-              token={token}
-              isAdmin={isAdmin}
-              sessionToken={sessionToken}
-              onWeekCreated={refreshData}
-            />
           </>
         )}
         {activeTab === 'familles' && (
@@ -112,6 +105,7 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
             token={token}
             canEdit={canEdit}
             refreshData={refreshData}
+            refreshPlanningGrid={refreshPlanningGrid}
           />
         )}
         {activeTab === 'semaines' && (
@@ -119,7 +113,9 @@ function AdminPanel({ token, isAdmin, canEdit, loginAdmin, logoutAdmin, refreshD
             token={token}
             canEdit={canEdit}
             refreshData={refreshData}
+            refreshPlanningGrid={refreshPlanningGrid}
             toggleSemainePublication={toggleSemainePublication}
+            sessionToken={sessionToken}
           />
         )}
         {activeTab === 'exclusions' && (

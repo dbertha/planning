@@ -156,6 +156,58 @@ export function usePlanningData(token) {
     }
   };
 
+  // Fonction pour recharger seulement la grille de planning (semaines + affectations)
+  const refreshPlanningGrid = async () => {
+    if (!token) {
+      return;
+    }
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      // Ajouter le token admin si disponible
+      if (authToken) {
+        headers['X-Admin-Session'] = authToken;
+      }
+
+      // Charger les classes
+      const classesResponse = await fetch(`/api/planning?token=${token}&type=classes`, {
+        method: 'GET',
+        headers
+      });
+
+      // Charger les semaines
+      const semainesResponse = await fetch(`/api/planning?token=${token}&type=semaines`, {
+        method: 'GET',
+        headers
+      });
+
+      // Charger les affectations
+      const affectationsResponse = await fetch(`/api/planning?token=${token}&type=affectations`, {
+        method: 'GET',
+        headers
+      });
+
+      if (classesResponse.ok && semainesResponse.ok && affectationsResponse.ok) {
+        const classes = await classesResponse.json();
+        const semaines = await semainesResponse.json();
+        const affectations = await affectationsResponse.json();
+        
+        // Mettre à jour les classes, semaines et affectations
+        setData(prevData => ({
+          ...prevData,
+          classes,
+          semaines,
+          affectations
+        }));
+      }
+    } catch (err) {
+      console.error('Erreur lors du rechargement de la grille:', err);
+    }
+  };
+
   // Fonction pour créer une affectation
   const createAffectation = async (familleId, classeId, semaineId, notes = '') => {
     if (!data.permissions.canEdit) {
@@ -401,6 +453,7 @@ export function usePlanningData(token) {
     toggleSemainePublication,
     autoDistributeWeek,
     refreshData: loadPlanningData,
+    refreshPlanningGrid,
     sessionToken: authToken
   };
 } 
