@@ -5,6 +5,23 @@ import { AddToCalendarIcon } from './AddToCalendarButton';
 export function AffectationCell({ classe, semaine, affectation, realAffectation, onMove, onFamilleDrop, onOverwriteRequest, isAdmin, famille, filters }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
+  // Vérifier si l'affectation correspond aux préférences de la famille
+  const isPreferredClass = () => {
+    if (!affectation || !famille || !famille.classes_preferences) {
+      return true; // Par défaut, on considère que c'est OK si pas d'info
+    }
+    
+    // Si la famille n'a pas de préférences définies, c'est OK
+    if (!famille.classes_preferences.length) {
+      return true;
+    }
+    
+    // Vérifier si la classe de l'affectation est dans les préférences
+    return famille.classes_preferences.includes(classe.id);
+  };
+
+  const isOutOfPreference = isAdmin && affectation && !isPreferredClass();
+
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'affectation',
     item: { affectation, classe, semaine },
@@ -36,16 +53,19 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
       } else if (item.type === 'famille' && realAffectation) {
         // Drop d'une famille sur une cellule occupée - demander confirmation
         onOverwriteRequest(item, realAffectation, classe, semaine);
-      } else if (realAffectation && item.affectation) {
+      } else if (item.affectation && realAffectation) {
         // Drop d'une affectation sur une autre (échange)
         onMove(item, { affectation: realAffectation, classe, semaine });
+      } else if (item.affectation && !realAffectation) {
+        // Drop d'une affectation sur une cellule vide (déplacement)
+        onMove(item, { affectation: null, classe, semaine });
       }
     },
     canDrop: (item) => {
       if (item.type === 'famille') {
         return isAdmin; // Accepter famille sur cellule vide OU occupée en mode admin
       }
-      return isAdmin && realAffectation && item.affectation; // Échange d'affectations
+      return isAdmin && item.affectation; // Accepter affectation sur cellule vide OU occupée
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -73,7 +93,7 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           drop(node);
         }
       }}
-      className={`affectation-cell ${isDragging ? 'dragging' : ''} ${isOver && canDrop ? 'drop-target' : ''} ${!realAffectation && isAdmin ? 'droppable' : ''} ${affectation ? '' : 'filtered-hidden'}`}
+      className={`affectation-cell ${isDragging ? 'dragging' : ''} ${isOver && canDrop ? 'drop-target' : ''} ${!realAffectation && isAdmin ? 'droppable' : ''} ${affectation ? '' : 'filtered-hidden'} ${isOutOfPreference ? 'out-of-preference' : ''}`}
       style={{ 
         backgroundColor: classe.couleur + '40',
         opacity: isDragging ? 0.5 : 1,
@@ -115,7 +135,18 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           
           {showTooltip && window.innerWidth > 768 && (
             <div className="famille-nom-tooltip">
-              {affectation.familleNom || 'Famille inconnue'}
+              <div className="tooltip-famille">{affectation.familleNom || 'Famille inconnue'}</div>
+              {isAdmin && famille && famille.classes_preferences && famille.classes_preferences.length > 0 && (
+                <div className="tooltip-preferences">
+                  <strong>Préférences :</strong> {famille.classes_preferences.join(', ')}
+                  {isOutOfPreference && (
+                    <div className="tooltip-warning">⚠️ Hors préférences</div>
+                  )}
+                </div>
+              )}
+              {isAdmin && famille && (!famille.classes_preferences || famille.classes_preferences.length === 0) && (
+                <div className="tooltip-no-prefs">Aucune préférence définie</div>
+              )}
             </div>
           )}
         </>
@@ -156,14 +187,15 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
         }
 
         .affectation-cell.droppable {
-          border-style: dashed;
-          border-color: #007bff;
+          border: 2px dashed #007bff;
+          background: rgba(0, 123, 255, 0.1);
         }
 
         .affectation-cell.drop-target {
-          border-color: #28a745;
+          border: 2px solid #28a745 !important;
           background-color: rgba(40, 167, 69, 0.1) !important;
           transform: scale(1.02);
+          transition: all 0.2s ease;
         }
 
         .affectation-cell.dragging {
@@ -186,16 +218,41 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
 
         .famille-nom-tooltip {
           position: absolute;
-          top: -30px;
+          top: -70px;
           left: 50%;
           transform: translateX(-50%);
-          background: #333;
+          background: rgba(0, 0, 0, 0.9);
           color: white;
-          padding: 4px 8px;
-          border-radius: 4px;
+          padding: 8px 12px;
+          border-radius: 6px;
           font-size: 11px;
           white-space: nowrap;
           z-index: 10;
+          min-width: 200px;
+          text-align: center;
+        }
+
+        .tooltip-famille {
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+
+        .tooltip-preferences {
+          font-size: 10px;
+          color: #e3f2fd;
+          margin-bottom: 2px;
+        }
+
+        .tooltip-warning {
+          color: #ffab91;
+          font-weight: 600;
+          margin-top: 2px;
+        }
+
+        .tooltip-no-prefs {
+          font-size: 10px;
+          color: #bdbdbd;
+          font-style: italic;
         }
 
         .affectation-content {
@@ -244,6 +301,38 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           border: 2px solid #dee2e6 !important;
           background-color: rgba(248, 249, 250, 0.8) !important;
           opacity: 0.7;
+        }
+
+        .affectation-cell.out-of-preference {
+          border: 2px solid #fd7e14 !important;
+          background: linear-gradient(135deg, 
+            rgba(255, 193, 7, 0.15), 
+            rgba(253, 126, 20, 0.15)
+          ) !important;
+          position: relative;
+        }
+
+        .affectation-cell.out-of-preference::before {
+          content: "⚠️";
+          position: absolute;
+          top: 2px;
+          right: 2px;
+          font-size: 12px;
+          z-index: 10;
+          background: rgba(253, 126, 20, 0.9);
+          color: white;
+          border-radius: 50%;
+          width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+        }
+
+        .affectation-cell.out-of-preference .famille-nom {
+          color: #e8590c !important;
+          font-weight: 600;
         }
 
         @media (max-width: 768px) {

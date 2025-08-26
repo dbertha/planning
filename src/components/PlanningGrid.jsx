@@ -18,7 +18,44 @@ export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectat
   });
 
   const handleMove = (from, to) => {
-    setExchangeProposal({ from, to });
+    if (to.affectation) {
+      // Échange entre deux affectations
+      setExchangeProposal({ from, to });
+    } else {
+      // Déplacement vers une cellule vide
+      handleMoveToEmpty(from, to);
+    }
+  };
+
+  const handleMoveToEmpty = async (from, to) => {
+    if (!canEdit) return;
+    
+    try {
+      const fromAffectation = from.affectation;
+      
+      console.log('📦 Déplacement vers cellule vide:', {
+        from: `${fromAffectation.familleNom} (${fromAffectation.classeNom})`,
+        to: `${to.classe.nom} - ${to.semaine.id}`
+      });
+      
+      // Étape 1: Supprimer l'ancienne affectation
+      await onDeleteAffectation(fromAffectation.id);
+      
+      // Étape 2: Créer la nouvelle affectation dans la cellule de destination
+      await onCreateAffectation(
+        fromAffectation.familleId,
+        to.classe.id,
+        to.semaine.id,
+        fromAffectation.notes || ''
+      );
+      
+      console.log('✅ Déplacement réussi !');
+      toast.success(`${fromAffectation.familleNom} déplacé vers ${to.classe.nom}`);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du déplacement:', error);
+      toast.error(`Erreur lors du déplacement : ${error.message}`);
+    }
   };
 
   const handleConfirmExchange = async () => {
