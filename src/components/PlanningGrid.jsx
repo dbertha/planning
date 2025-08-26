@@ -107,6 +107,7 @@ export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectat
           semaine={semaine}
           classes={data.classes}
           affectations={filteredAffectations}
+          allAffectations={data.affectations}
           onAffectationMove={handleMove}
           onFamilleDrop={handleFamilleDrop}
           onOverwriteRequest={handleOverwriteRequest}

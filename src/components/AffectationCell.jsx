@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 
-export function AffectationCell({ classe, semaine, affectation, onMove, onFamilleDrop, onOverwriteRequest, isAdmin }) {
+export function AffectationCell({ classe, semaine, affectation, realAffectation, onMove, onFamilleDrop, onOverwriteRequest, isAdmin }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -29,22 +29,22 @@ export function AffectationCell({ classe, semaine, affectation, onMove, onFamill
   const [{ isOver, canDrop }, drop] = useDrop(() => ({
     accept: ['affectation', 'famille'],
     drop: (item) => {
-      if (item.type === 'famille' && !affectation) {
-        // Drop d'une famille sur une cellule vide
+      if (item.type === 'famille' && !realAffectation) {
+        // Drop d'une famille sur une cellule vraiment vide
         onFamilleDrop(item.id, classe.id, semaine.id);
-      } else if (item.type === 'famille' && affectation) {
+      } else if (item.type === 'famille' && realAffectation) {
         // Drop d'une famille sur une cellule occupée - demander confirmation
-        onOverwriteRequest(item, affectation, classe, semaine);
-      } else if (affectation && item.affectation) {
+        onOverwriteRequest(item, realAffectation, classe, semaine);
+      } else if (realAffectation && item.affectation) {
         // Drop d'une affectation sur une autre (échange)
-        onMove(item, { affectation, classe, semaine });
+        onMove(item, { affectation: realAffectation, classe, semaine });
       }
     },
     canDrop: (item) => {
       if (item.type === 'famille') {
         return isAdmin; // Accepter famille sur cellule vide OU occupée en mode admin
       }
-      return isAdmin && affectation && item.affectation; // Échange d'affectations
+      return isAdmin && realAffectation && item.affectation; // Échange d'affectations
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -72,7 +72,7 @@ export function AffectationCell({ classe, semaine, affectation, onMove, onFamill
           drop(node);
         }
       }}
-      className={`affectation-cell ${isDragging ? 'dragging' : ''} ${isOver && canDrop ? 'drop-target' : ''} ${!affectation && isAdmin ? 'droppable' : ''}`}
+      className={`affectation-cell ${isDragging ? 'dragging' : ''} ${isOver && canDrop ? 'drop-target' : ''} ${!realAffectation && isAdmin ? 'droppable' : ''} ${affectation ? '' : 'filtered-hidden'}`}
       style={{ 
         backgroundColor: classe.couleur + '40',
         opacity: isDragging ? 0.5 : 1,
@@ -99,10 +99,18 @@ export function AffectationCell({ classe, semaine, affectation, onMove, onFamill
         </>
       )}
       
-      {/* Indicateur de zone de drop pour cellules vides en mode admin */}
-      {!affectation && isAdmin && (
+      {/* Indicateur de zone de drop pour cellules vraiment vides en mode admin */}
+      {!realAffectation && isAdmin && (
         <div className="drop-placeholder">
           Glisser une famille ici
+        </div>
+      )}
+      
+      {/* Indicateur pour cellules filtrées mais occupées */}
+      {!affectation && realAffectation && isAdmin && (
+        <div className="filtered-placeholder">
+          👁️‍🗨️ Masquée par filtre<br/>
+          <small>Cellule occupée</small>
         </div>
       )}
 
@@ -179,6 +187,24 @@ export function AffectationCell({ classe, semaine, affectation, onMove, onFamill
           text-align: center;
           opacity: 0.7;
           font-style: italic;
+        }
+
+        .filtered-placeholder {
+          color: #6c757d;
+          font-size: 10px;
+          text-align: center;
+          font-weight: 500;
+          font-style: italic;
+          background: rgba(248, 249, 250, 0.9);
+          padding: 4px;
+          border-radius: 4px;
+          border: 1px solid #dee2e6;
+        }
+
+        .affectation-cell.filtered-hidden {
+          border: 2px solid #dee2e6 !important;
+          background-color: rgba(248, 249, 250, 0.8) !important;
+          opacity: 0.7;
         }
 
         @media (max-width: 768px) {
