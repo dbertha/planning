@@ -30,16 +30,23 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
   const loadExclusions = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/familles?token=${planningToken}&action=get_exclusions&famille_id=${familleId}`);
+      const response = await fetch(`/api/familles?token=${planningToken}&action=get_exclusions&famille_id=${familleId}`, {
+        headers: {
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        }
+      });
       
       if (response.ok) {
         const data = await response.json();
         setExclusions(data);
       } else {
-        console.error('Erreur lors du chargement des exclusions');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Erreur lors du chargement des exclusions:', errorData.error || response.status);
+        toast.error(`Erreur lors du chargement des exclusions: ${errorData.error || 'Erreur inconnue'}`);
       }
     } catch (error) {
       console.error('Erreur:', error);
+      toast.error('Erreur de connexion lors du chargement des exclusions');
     } finally {
       setLoading(false);
     }
@@ -61,7 +68,10 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
     try {
       const response = await fetch(`/api/familles?token=${planningToken}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
         body: JSON.stringify({
           action: 'add_exclusion',
           famille_id: familleId,
@@ -102,7 +112,10 @@ const ExclusionsManager = ({ familleId, familleName, planningToken, onClose }) =
     try {
       const response = await fetch(`/api/familles/${exclusionId}?token=${planningToken}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
         body: JSON.stringify({ action: 'delete_exclusion' })
       });
 

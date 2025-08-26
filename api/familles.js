@@ -55,9 +55,22 @@ async function handleGet(req, res) {
         break;
 
       case 'exclusions':
+      case 'get_exclusions': // Alias pour compatibilité
         if (!famille_id) {
           return res.status(400).json({ error: 'ID famille requis' });
         }
+        
+        // Vérifier que c'est un admin pour accéder aux exclusions
+        const adminSessionToken = req.headers['x-admin-session'];
+        if (!adminSessionToken) {
+          return res.status(401).json({ error: 'Session admin requise pour accéder aux exclusions' });
+        }
+        
+        const adminValidation = await validateAdminSession(adminSessionToken);
+        if (!adminValidation.isAdmin) {
+          return res.status(403).json({ error: 'Droits administrateur requis' });
+        }
+        
         const exclusions = await getFamilleExclusions(parseInt(famille_id), planning.id);
         res.status(200).json(exclusions);
         break;
@@ -171,7 +184,9 @@ async function handleGet(req, res) {
 
 async function handlePost(req, res) {
   try {
-    const { token, action, data } = req.body;
+    // Le token peut être dans l'URL (req.query) ou dans le body (req.body)
+    const token = req.query.token || req.body.token;
+    const { action, data } = req.body;
     
     if (!token) {
       return res.status(400).json({ error: 'Token requis' });
@@ -222,6 +237,17 @@ async function handlePost(req, res) {
         break;
 
       case 'add_exclusion':
+        // Vérifier l'authentification admin pour ajouter une exclusion
+        const adminSessionForAdd = req.headers['x-admin-session'];
+        if (!adminSessionForAdd) {
+          return res.status(401).json({ error: 'Session admin requise pour ajouter une exclusion' });
+        }
+        
+        const adminValidationForAdd = await validateAdminSession(adminSessionForAdd);
+        if (!adminValidationForAdd.isAdmin) {
+          return res.status(403).json({ error: 'Droits administrateur requis' });
+        }
+        
         // Les données peuvent être dans data ou directement dans req.body (legacy)
         const exclusionData = data || req.body;
         if (!exclusionData.famille_id || !exclusionData.date_debut || !exclusionData.date_fin) {
@@ -277,7 +303,9 @@ async function handlePost(req, res) {
 
 async function handlePut(req, res) {
   try {
-    const { token, id, data, action } = req.body;
+    // Le token peut être dans l'URL (req.query) ou dans le body (req.body)
+    const token = req.query.token || req.body.token;
+    const { id, data, action } = req.body;
     
     if (!token) {
       return res.status(400).json({ error: 'Token requis' });
@@ -352,7 +380,9 @@ async function handlePut(req, res) {
 
 async function handleDelete(req, res) {
   try {
-    const { token, id, action } = req.body;
+    // Le token peut être dans l'URL (req.query) ou dans le body (req.body)
+    const token = req.query.token || req.body.token;
+    const { id, action } = req.body;
     
     if (!token) {
       return res.status(400).json({ error: 'Token requis' });
@@ -361,6 +391,17 @@ async function handleDelete(req, res) {
     const planning = await validateTokenAndGetPlanning(token);
 
     if (action === 'delete_exclusion') {
+      // Vérifier l'authentification admin pour supprimer une exclusion
+      const adminSessionForDelete = req.headers['x-admin-session'];
+      if (!adminSessionForDelete) {
+        return res.status(401).json({ error: 'Session admin requise pour supprimer une exclusion' });
+      }
+      
+      const adminValidationForDelete = await validateAdminSession(adminSessionForDelete);
+      if (!adminValidationForDelete.isAdmin) {
+        return res.status(403).json({ error: 'Droits administrateur requis' });
+      }
+      
       // Suppression d'une exclusion
       const result = await query(
         'DELETE FROM familles_exclusions WHERE id = $1 AND planning_id = $2 RETURNING *',
