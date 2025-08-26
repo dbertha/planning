@@ -507,83 +507,15 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
       };
     }
 
-    // 6. Algorithme de distribution équitable
-    const affectationsToCreate = [];
-    const familiesAlreadyAssignedThisWeek = new Set(); // Track familles déjà assignées cette semaine
-    
-    for (const classe of availableClasses) {
-      // Trouver les familles disponibles pour cette classe et cette période
-      const availableFamilies = await getAvailableFamiliesForPeriod(
-        classe.id, 
-        semaineId, 
-        planningId, 
-        debut, 
-        fin
-      );
-
-      // Filtrer les familles déjà assignées dans cette session d'auto-distribution
-      const trulyAvailableFamilies = availableFamilies.filter(famille => 
-        !familiesAlreadyAssignedThisWeek.has(famille.id)
-      );
-
-      if (trulyAvailableFamilies.length === 0) {
-        continue;
-      }
-
-      // Enrichir avec les statistiques et calculer le score de priorité
-      const familiesWithScores = trulyAvailableFamilies.map(famille => {
-        const stats = famillesStats.find(s => s.id === famille.id) || {
-          current_affectations: 0,
-          percentage_completed: 0
-        };
-
-        // Score de priorité basé sur :
-        // 1. Pourcentage de nettoyages déjà effectués (plus faible = priorité plus haute)
-        // 2. Préférence pour cette classe (bonus)
-        // 3. Randomisation légère pour éviter la monotonie
-        let priorityScore = 100 - stats.percentage_completed; // Base : moins on a fait, plus on est prioritaire
-        
-        if (famille.has_preference) {
-          priorityScore += 20; // Bonus pour les préférences
-        }
-        
-        // Petit facteur aléatoire pour éviter les patterns trop prévisibles
-        priorityScore += Math.random() * 10;
-
-        return {
-          ...famille,
-          ...stats,
-          priorityScore
-        };
-      });
-
-      // Trier par score de priorité (décroissant)
-      familiesWithScores.sort((a, b) => b.priorityScore - a.priorityScore);
-
-      // Sélectionner la famille avec le meilleur score
-      const selectedFamily = familiesWithScores[0];
-
-      affectationsToCreate.push({
-        famille_id: selectedFamily.id,
-        classe_id: classe.id,
-        semaine_id: semaineId,
-        notes: `Attribution automatique (${selectedFamily.percentage_completed.toFixed(1)}% complété)`
-      });
-
-      // ⚡ CRUCIAL : Marquer cette famille comme assignée pour cette semaine
-      familiesAlreadyAssignedThisWeek.add(selectedFamily.id);
-
-      // ⚡ CRUCIAL : Mettre à jour les stats de la famille sélectionnée
-      // pour éviter qu'elle soit re-sélectionnée pour les classes suivantes
-      const familleStats = famillesStats.find(s => s.id === selectedFamily.id);
-      if (familleStats) {
-        familleStats.current_affectations += 1;
-        // Recalculer le pourcentage en fonction du max possible
-        const maxPossible = selectedFamily.nb_nettoyage || 1;
-        familleStats.percentage_completed = (familleStats.current_affectations / maxPossible) * 100;
-      }
-    }
-
+    // 6. Algorithme de distribution optimisée (évite les assignations sous-optimales)
+    const affectationsToCreate = await optimizeAssignments(
+      availableClasses, 
+      famillesStats, 
+      semaineId, 
+      planningId, 
+      debut, 
+      fin
+    );
     // 7. Créer les affectations en base
     let createdCount = 0;
     const createdAffectations = [];
@@ -656,6 +588,154 @@ const calculateFamiliesStats = async (planningId, currentDate) => {
   `, [planningId, currentDate]);
 
   return result.rows;
+};
+
+// Algorithme d'assignation équilibrée avec respect des préférences
+const optimizeAssignments = async (availableClasses, famillesStats, semaineId, planningId, debut, fin) => {
+  console.log(`🎯 Début de l'optimisation pour ${availableClasses.length} classes disponibles`);
+  
+  // 1. Récupérer toutes les familles disponibles (sans exclusions)
+  const allAvailableFamilies = [];
+  const familiesByClass = new Map();
+  
+  for (const classe of availableClasses) {
+    const availableFamilies = await getAvailableFamiliesForPeriod(
+      classe.id, 
+      semaineId, 
+      planningId, 
+      debut, 
+      fin
+    );
+    
+    familiesByClass.set(classe.id, availableFamilies);
+    
+    // Collecter toutes les familles uniques
+    for (const famille of availableFamilies) {
+      if (!allAvailableFamilies.find(f => f.id === famille.id)) {
+        const stats = famillesStats.find(s => s.id === famille.id) || {
+          current_affectations: 0,
+          percentage_completed: 0
+        };
+        allAvailableFamilies.push({ ...famille, ...stats });
+      }
+    }
+  }
+
+  console.log(`👨‍👩‍👧‍👦 ${allAvailableFamilies.length} familles disponibles au total`);
+
+  // 2. Sélection équilibrée des familles (priorité aux moins chargées)
+  const selectedFamilies = allAvailableFamilies
+    .sort((a, b) => {
+      // Tri principal : pourcentage de completion
+      if (a.percentage_completed !== b.percentage_completed) {
+        return a.percentage_completed - b.percentage_completed;
+      }
+      // Tri secondaire : randomisation pour éviter les patterns
+      return Math.random() - 0.5;
+    })
+    .slice(0, availableClasses.length); // Prendre autant de familles que de classes
+
+  console.log(`🎲 ${selectedFamilies.length} familles sélectionnées pour équilibrage`);
+
+  // 3. Algorithme d'assignation avec préférences
+  const assignments = [];
+  const usedFamilies = new Set();
+  const usedClasses = new Set();
+  
+  // Phase 1: Essayer d'assigner chaque famille à une classe de ses préférences
+  for (const famille of selectedFamilies) {
+    if (usedFamilies.has(famille.id)) continue;
+    
+    // Trouver les classes disponibles pour cette famille
+    let availableClassesForFamily = availableClasses.filter(classe => 
+      !usedClasses.has(classe.id) && 
+      familiesByClass.get(classe.id)?.find(f => f.id === famille.id)
+    );
+    
+    // Séparer les classes préférées des autres
+    const preferredClasses = availableClassesForFamily.filter(classe => 
+      famille.classes_preferences && famille.classes_preferences.includes(classe.id)
+    );
+    
+    const nonPreferredClasses = availableClassesForFamily.filter(classe => 
+      !famille.classes_preferences || !famille.classes_preferences.includes(classe.id)
+    );
+    
+    // Priorité aux préférences, sinon première classe disponible
+    const classeToAssign = preferredClasses.length > 0 
+      ? preferredClasses[0] 
+      : nonPreferredClasses[0];
+    
+    if (classeToAssign) {
+      const isPreferred = preferredClasses.includes(classeToAssign);
+      
+      assignments.push({
+        famille_id: famille.id,
+        classe_id: classeToAssign.id,
+        semaine_id: semaineId,
+        planning_id: planningId,
+        notes: `Auto-assigné ${isPreferred ? '(préférence)' : '(équilibrage)'} - ${famille.percentage_completed.toFixed(1)}% complété`
+      });
+      
+      usedFamilies.add(famille.id);
+      usedClasses.add(classeToAssign.id);
+      
+      console.log(`✅ ${famille.nom} → Classe ${classeToAssign.id} ${isPreferred ? '(PREF)' : '(EQUI)'}`);
+    }
+  }
+
+  // Phase 2: Remplir les classes restantes avec les familles restantes
+  const remainingClasses = availableClasses.filter(classe => !usedClasses.has(classe.id));
+  
+  if (remainingClasses.length > 0) {
+    console.log(`🔄 Phase 2: ${remainingClasses.length} classes restantes à assigner`);
+    
+    for (const classe of remainingClasses) {
+      const availableFamiliesForClass = familiesByClass.get(classe.id)?.filter(famille => 
+        !usedFamilies.has(famille.id)
+      ) || [];
+      
+      if (availableFamiliesForClass.length > 0) {
+        // Trier par charge croissante puis préférence
+        availableFamiliesForClass.sort((a, b) => {
+          const statsA = famillesStats.find(s => s.id === a.id) || { percentage_completed: 0 };
+          const statsB = famillesStats.find(s => s.id === b.id) || { percentage_completed: 0 };
+          
+          // Priorité 1: familles avec préférence pour cette classe
+          const prefA = a.classes_preferences?.includes(classe.id) ? 1 : 0;
+          const prefB = b.classes_preferences?.includes(classe.id) ? 1 : 0;
+          if (prefA !== prefB) return prefB - prefA;
+          
+          // Priorité 2: charge la plus faible
+          return statsA.percentage_completed - statsB.percentage_completed;
+        });
+        
+        const selectedFamille = availableFamiliesForClass[0];
+        const stats = famillesStats.find(s => s.id === selectedFamille.id) || { percentage_completed: 0 };
+        const isPreferred = selectedFamille.classes_preferences?.includes(classe.id);
+        
+        assignments.push({
+          famille_id: selectedFamille.id,
+          classe_id: classe.id,
+          semaine_id: semaineId,
+          planning_id: planningId,
+          notes: `Auto-assigné ${isPreferred ? '(préférence)' : '(complément)'} - ${stats.percentage_completed.toFixed(1)}% complété`
+        });
+        
+        usedFamilies.add(selectedFamille.id);
+        
+        console.log(`✅ ${selectedFamille.nom} → Classe ${classe.id} ${isPreferred ? '(PREF)' : '(COMP)'}`);
+      }
+    }
+  }
+
+  const preferencesRespected = assignments.filter(a => a.notes.includes('préférence')).length;
+  const totalAssignments = assignments.length;
+  const preferenceRate = totalAssignments > 0 ? (preferencesRespected / totalAssignments * 100).toFixed(1) : 0;
+  
+  console.log(`📊 Résultat: ${totalAssignments} assignations, ${preferencesRespected} préférences respectées (${preferenceRate}%)`);
+  
+  return assignments;
 };
 
 // Fonction utilitaire pour obtenir les familles disponibles pour une classe et période spécifique
