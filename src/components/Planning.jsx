@@ -23,6 +23,7 @@ export function Planning() {
     loginAdmin,
     logoutAdmin,
     refreshData,
+    refreshPlanningGrid,
     createAffectation,
     deleteAffectation,
     toggleSemainePublication,
@@ -295,17 +296,18 @@ export function Planning() {
 
       {/* Interface d'administration */}
       {showAdmin && (
-        <AdminPanel
-          token={token}
-          isAdmin={isAdmin}
-          canEdit={canEdit}
-          loginAdmin={loginAdmin}
-          logoutAdmin={logoutAdmin}
-          refreshData={refreshData}
-          toggleSemainePublication={toggleSemainePublication}
-          planningData={data}
-          sessionToken={sessionToken}
-        />
+                  <AdminPanel
+            token={token}
+            isAdmin={isAdmin}
+            canEdit={canEdit}
+            loginAdmin={loginAdmin}
+            logoutAdmin={logoutAdmin}
+            refreshData={refreshData}
+            refreshPlanningGrid={refreshPlanningGrid}
+            toggleSemainePublication={toggleSemainePublication}
+            planningData={data}
+            sessionToken={sessionToken}
+          />
       )}
       
       {/* Filtres et sélecteurs */}

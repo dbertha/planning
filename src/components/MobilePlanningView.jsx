@@ -125,11 +125,16 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
                           telephone: ''
                         };
                       }
+
+                      // Vérifier si l'affectation correspond aux préférences de la famille
+                      const isOutOfPreference = isAdmin && famille && famille.classes_preferences && 
+                        famille.classes_preferences.length > 0 && 
+                        !famille.classes_preferences.includes(affectation.classeId);
                       
                       return (
                         <div 
                           key={affectation.id} 
-                          className="assignment-item"
+                          className={`assignment-item ${isOutOfPreference ? 'out-of-preference' : ''}`}
                           style={{ borderLeftColor: affectation.classeCouleur }}
                         >
                           <div className="assignment-header">
