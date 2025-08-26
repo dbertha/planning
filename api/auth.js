@@ -140,7 +140,7 @@ async function handlePost(req, res) {
 
       case 'create_planning':
         // Créer un nouveau planning
-        const { name, description, year, adminPassword, customToken } = data;
+        const { name, description, year, customToken } = data;
         
         if (!name) {
           return res.status(400).json({ error: 'Nom du planning requis' });
@@ -153,23 +153,10 @@ async function handlePost(req, res) {
           customToken
         );
 
-        // Si un mot de passe admin est fourni, créer automatiquement une session
-        let sessionToken = null;
-        let expiresAt = null;
-        
-        if (adminPassword) {
-          const authResult = await authenticateAdmin(newPlanning.token, adminPassword);
-          sessionToken = authResult.sessionToken;
-          expiresAt = authResult.expiresAt;
-        }
-
         res.status(201).json({
           success: true,
           planning: newPlanning,
-          url: `${req.headers.host || 'localhost'}?token=${newPlanning.token}`,
-          sessionToken,
-          expiresAt,
-          isAdmin: !!adminPassword
+          url: `${req.headers.host || 'localhost'}?token=${newPlanning.token}`
         });
         break;
 

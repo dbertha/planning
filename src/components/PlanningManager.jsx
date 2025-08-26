@@ -12,7 +12,6 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
     name: '',
     description: '',
     year: new Date().getFullYear(),
-    adminPassword: '',
     customToken: ''
   });
   const [switchToken, setSwitchToken] = useState('');
@@ -47,7 +46,6 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
         name: '',
         description: '',
         year: new Date().getFullYear(),
-        adminPassword: '',
         customToken: ''
       });
       setShowCreateForm(false);
@@ -191,27 +189,15 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
               />
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>Année scolaire :</label>
-                <input
-                  type="number"
-                  value={createData.year}
-                  onChange={(e) => setCreateData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
-                  min="2020"
-                  max="2030"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Mot de passe admin :</label>
-                <input
-                  type="password"
-                  value={createData.adminPassword}
-                  onChange={(e) => setCreateData(prev => ({ ...prev, adminPassword: e.target.value }))}
-                  placeholder="Mot de passe administrateur"
-                />
-              </div>
+            <div className="form-group">
+              <label>Année scolaire :</label>
+              <input
+                type="number"
+                value={createData.year}
+                onChange={(e) => setCreateData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                min="2020"
+                max="2040"
+              />
             </div>
 
             <div className="form-group">
