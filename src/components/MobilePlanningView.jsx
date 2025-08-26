@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { AddToCalendarButton } from './AddToCalendarButton';
 
 export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
   // Fonction pour formater les dates
@@ -109,29 +110,61 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
                   </div>
                 ) : (
                   <div className="assignments-list">
-                    {affectations.map(affectation => (
-                      <div 
-                        key={affectation.id} 
-                        className="assignment-item"
-                        style={{ borderLeftColor: affectation.classeCouleur }}
-                      >
-                        <div className="assignment-class">
-                          <span 
-                            className="class-color"
-                            style={{ backgroundColor: affectation.classeCouleur }}
-                          ></span>
-                          <span className="class-name">{affectation.classeNom}</span>
-                        </div>
-                        <div className="assignment-family">
-                          {affectation.familleNom}
-                        </div>
-                        {affectation.notes && (
-                          <div className="assignment-notes">
-                            💬 {affectation.notes}
+                    {affectations.map(affectation => {
+                      // Trouver la classe correspondante
+                      const classe = data.classes?.find(c => c.id === affectation.classeId);
+                      // Trouver la famille correspondante
+                      let famille = data.familles?.find(f => f.id === affectation.familleId);
+                      
+                      // Si famille non trouvée, créer un objet temporaire pour le calendrier
+                      if (!famille && affectation.familleNom) {
+                        famille = {
+                          id: affectation.familleId,
+                          nom: affectation.familleNom,
+                          email: '',
+                          telephone: ''
+                        };
+                      }
+                      
+                      return (
+                        <div 
+                          key={affectation.id} 
+                          className="assignment-item"
+                          style={{ borderLeftColor: affectation.classeCouleur }}
+                        >
+                          <div className="assignment-header">
+                            <div className="assignment-class">
+                              <span 
+                                className="class-color"
+                                style={{ backgroundColor: affectation.classeCouleur }}
+                              ></span>
+                              <span className="class-name">{affectation.classeNom}</span>
+                            </div>
+                            {!isAdmin && classe && famille && filters?.search && (
+                              affectation?.familleNom?.toLowerCase().includes(filters.search.toLowerCase()) || 
+                              filters.search.toLowerCase().includes(affectation?.familleNom?.toLowerCase())
+                            ) && (
+                              <AddToCalendarButton 
+                                affectation={affectation}
+                                semaine={semaine}
+                                classe={classe}
+                                famille={famille}
+                                size="medium"
+                                mode="public"
+                              />
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          <div className="assignment-family">
+                            {affectation.familleNom}
+                          </div>
+                          {affectation.notes && (
+                            <div className="assignment-notes">
+                              💬 {affectation.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -277,11 +310,18 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
           background: #e9ecef;
         }
 
+        .assignment-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 6px;
+        }
+
         .assignment-class {
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-bottom: 6px;
+          flex: 1;
         }
 
         .class-color {

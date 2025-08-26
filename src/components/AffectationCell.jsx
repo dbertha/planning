@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
+import { AddToCalendarIcon } from './AddToCalendarButton';
 
-export function AffectationCell({ classe, semaine, affectation, realAffectation, onMove, onFamilleDrop, onOverwriteRequest, isAdmin }) {
+export function AffectationCell({ classe, semaine, affectation, realAffectation, onMove, onFamilleDrop, onOverwriteRequest, isAdmin, famille, filters }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   const [{ isDragging }, drag] = useDrag(() => ({
@@ -81,20 +82,41 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
     >
       {affectation && (
         <>
-          <div 
-            className="famille-nom"
-            onMouseEnter={() => setShowTooltip(true)}
-            onMouseLeave={() => setShowTooltip(false)}
-          >
-            {truncateText(affectation.familleNom || 'Famille inconnue', window.innerWidth <= 768 ? 30 : 20)}
+          <div className="affectation-content">
+            <div 
+              className="famille-nom"
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+            >
+              {truncateText(affectation.familleNom || 'Famille inconnue', window.innerWidth <= 768 ? 30 : 20)}
+            </div>
+            
+            <div className="bottom-info">
+              {affectation.numeroNettoyage && (
+                <div className="nettoyage-numero">#{affectation.numeroNettoyage}</div>
+              )}
+              
+              {/* Bouton calendrier - affiché en mode public pour la famille recherchée */}
+              {!isAdmin && famille && filters?.search && (
+                affectation?.familleNom?.toLowerCase().includes(filters.search.toLowerCase()) || 
+                filters.search.toLowerCase().includes(affectation?.familleNom?.toLowerCase())
+              ) && (
+                <div className="calendar-actions">
+                  <AddToCalendarIcon 
+                    affectation={affectation}
+                    semaine={semaine}
+                    classe={classe}
+                    famille={famille}
+                  />
+                </div>
+              )}
+            </div>
           </div>
+          
           {showTooltip && window.innerWidth > 768 && (
             <div className="famille-nom-tooltip">
               {affectation.familleNom || 'Famille inconnue'}
             </div>
-          )}
-          {affectation.numeroNettoyage && (
-            <div className="nettoyage-numero">#{affectation.numeroNettoyage}</div>
           )}
         </>
       )}
@@ -117,6 +139,7 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
       <style jsx>{`
         .affectation-cell {
           min-height: 80px;
+          position: relative;
           min-width: 150px;
           background: white;
           border: none;
@@ -175,10 +198,26 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           z-index: 10;
         }
 
+        .affectation-content {
+          flex: 1;
+        }
+
+        .bottom-info {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
         .nettoyage-numero {
           font-size: 10px;
           color: #666;
           font-weight: 500;
+        }
+
+        .calendar-actions {
+          display: inline-flex;
         }
 
         .drop-placeholder {
@@ -221,6 +260,8 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           .nettoyage-numero {
             font-size: 8px;
           }
+
+
 
           .drop-placeholder {
             font-size: 9px;

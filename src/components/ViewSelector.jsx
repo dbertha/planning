@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
-export function ViewSelector({ filters, onFilterChange, data, onScrollToCurrentWeek }) {
+export function ViewSelector({ filters, onFilterChange, data, onScrollToCurrentWeek, isAdmin }) {
   const [searchInput, setSearchInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -87,6 +87,13 @@ export function ViewSelector({ filters, onFilterChange, data, onScrollToCurrentW
           </button>
         )}
         </div>
+        
+        {/* Message d'aide pour le calendrier */}
+        {filters.search && !isAdmin && (
+          <div className="calendar-help">
+            💡 <strong>Astuce :</strong> Cliquez sur 📅 <em>Calendrier</em> à côté de vos affectations pour les ajouter à votre agenda personnel !
+          </div>
+        )}
         
         {/* Navigation rapide */}
         <div className="quick-actions">
@@ -227,10 +234,41 @@ export function ViewSelector({ filters, onFilterChange, data, onScrollToCurrentW
           transform: translateY(-1px);
         }
 
+        .calendar-help {
+          background: linear-gradient(90deg, #e8f5e8, #f8fff8);
+          border: 1px solid #28a745;
+          border-radius: 6px;
+          padding: 12px 16px;
+          margin: 12px 0;
+          font-size: 14px;
+          color: #155724;
+          animation: slideIn 0.3s ease-out;
+          max-width: 100%;
+          box-sizing: border-box;
+          word-wrap: break-word;
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
         @media (max-width: 768px) {
           .filters-row {
             flex-direction: column;
             gap: 12px;
+          }
+
+          .calendar-help {
+            font-size: 13px;
+            padding: 10px 12px;
+            margin: 8px 0;
           }
 
           .family-filter {

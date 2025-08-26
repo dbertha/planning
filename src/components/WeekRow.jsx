@@ -3,7 +3,7 @@ import { AffectationCell } from './AffectationCell';
 import { formatDate } from '../utils/dateUtils';
 import { useToast } from './Toast';
 
-export function WeekRow({ semaine, classes, affectations, allAffectations, onAffectationMove, onFamilleDrop, onOverwriteRequest, isAdmin, canEdit, onAutoDistribute, onTogglePublish }) {
+export function WeekRow({ semaine, classes, familles, affectations, allAffectations, filters, onAffectationMove, onFamilleDrop, onOverwriteRequest, isAdmin, canEdit, onAutoDistribute, onTogglePublish }) {
   const isPublished = semaine.is_published;
   const [isDistributing, setIsDistributing] = useState(false);
   const toast = useToast();
@@ -107,6 +107,25 @@ export function WeekRow({ semaine, classes, affectations, allAffectations, onAff
             a => a.classeId === classe.id && a.semaineId === semaine.id
           ) : cellAffectation;
           
+          // Trouver la famille correspondante à l'affectation
+          let famille = cellAffectation && familles ? familles.find(
+            f => f.id === cellAffectation.familleId
+          ) : null;
+          
+
+          
+
+          // Si famille non trouvée, créer un objet temporaire pour le calendrier
+          if (cellAffectation && !famille && cellAffectation.familleNom) {
+            famille = {
+              id: cellAffectation.familleId,
+              nom: cellAffectation.familleNom,
+              email: '',
+              telephone: ''
+            };
+          }
+          
+
           return (
             <AffectationCell
               key={`${semaine.id}-${classe.id}-${cellAffectation?.id || realAffectation?.id || 'empty'}-${cellAffectation?._refreshKey || ''}`}
@@ -114,6 +133,8 @@ export function WeekRow({ semaine, classes, affectations, allAffectations, onAff
               semaine={semaine}
               affectation={cellAffectation}
               realAffectation={realAffectation}
+              famille={famille}
+              filters={filters}
               onMove={onAffectationMove}
               onFamilleDrop={onFamilleDrop}
               onOverwriteRequest={onOverwriteRequest}
