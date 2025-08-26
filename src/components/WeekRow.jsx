@@ -48,15 +48,19 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
   };
   
   return (
-    <div className={`semaine-row ${!isPublished ? 'unpublished' : ''}`}>
-      <div className="semaine-header">
+    <div 
+      className={`semaine-row ${!isPublished ? 'unpublished' : ''}`}
+      id={`week-${semaine.id}`}
+    >
+      {/* Colonne fixe avec informations et actions */}
+      <div className="semaine-sidebar">
         <div className="semaine-info">
           <div className="semaine-dates">
             {formatDate(semaine.debut)} - {formatDate(semaine.fin)}
-            {semaine.type === 'SPECIAL' && (
-              <span className="semaine-special">{semaine.description}</span>
-            )}
           </div>
+          {semaine.type === 'SPECIAL' && (
+            <div className="semaine-special">{semaine.description}</div>
+          )}
         </div>
         
         <div className="semaine-actions">
@@ -88,6 +92,7 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
         </div>
       </div>
       
+      {/* Zone scrollable avec affectations */}
       <div className="semaine-affectations">
         {classes.map(classe => {
           const cellAffectation = affectations.find(
@@ -112,7 +117,6 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
       <style jsx>{`
         .semaine-row {
           display: flex;
-          flex-direction: column;
           border-bottom: 1px solid #eee;
           min-height: 80px;
           transition: all 0.2s;
@@ -123,35 +127,29 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
           border-left: 4px solid #ffc107;
         }
 
-        .semaine-header {
-          position: sticky;
-          top: 0;
-          z-index: 10;
+        .semaine-sidebar {
+          width: 240px;
+          min-width: 240px;
           background: #f8f9fa;
-          border-bottom: 1px solid #ddd;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+          border-right: 1px solid #ddd;
           padding: 12px;
-          min-height: 60px;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 8px;
+          position: sticky;
+          left: 0;
+          z-index: 5;
         }
 
         .semaine-info {
           flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 12px;
         }
 
         .semaine-actions {
           display: flex;
-          align-items: center;
-          gap: 8px;
-          flex-shrink: 0;
-          background: #f8f9fa;
-          padding: 4px;
-          border-radius: 6px;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          flex-direction: column;
+          gap: 6px;
         }
 
         .semaine-dates {
@@ -166,11 +164,12 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
         .semaine-special {
           background: #e7f3ff;
           color: #0066cc;
-          padding: 2px 6px;
+          padding: 4px 8px;
           border-radius: 4px;
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 500;
-          margin-left: 8px;
+          margin-top: 4px;
+          text-align: center;
         }
 
         .unpublished-badge {
@@ -184,42 +183,46 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
 
         .publish-toggle-btn {
           border: none;
-          padding: 3px 8px;
-          border-radius: 4px;
-          font-size: 10px;
+          border-radius: 6px;
+          padding: 8px 12px;
+          font-size: 12px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.2s ease;
+          width: 100%;
+          text-align: center;
         }
 
         .publish-toggle-btn.published {
-          background: #28a745;
+          background: linear-gradient(135deg, #28a745, #20c997);
           color: white;
+          box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
         }
 
         .publish-toggle-btn.unpublished {
-          background: #ffc107;
+          background: linear-gradient(135deg, #ffc107, #fd7e14);
           color: #212529;
+          box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
         }
 
         .publish-toggle-btn:hover {
-          transform: scale(1.05);
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .auto-distribute-btn {
-          background: #28a745;
+          background: linear-gradient(135deg, #28a745, #20c997);
           color: white;
           border: none;
-          padding: 3px 8px;
-          border-radius: 4px;
-          font-size: 10px;
+          padding: 8px 12px;
+          border-radius: 6px;
+          font-size: 12px;
           font-weight: 500;
           cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          gap: 2px;
+          transition: all 0.2s ease;
+          width: 100%;
+          text-align: center;
+          box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
         }
 
         .auto-distribute-btn:hover:not(:disabled) {

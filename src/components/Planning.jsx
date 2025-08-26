@@ -4,6 +4,7 @@ import { PlanningHeader } from './PlanningHeader';
 import { PlanningGrid } from './PlanningGrid';
 import { ViewSelector } from './ViewSelector';
 import { FamiliesSidebar } from './FamiliesSidebar';
+import { MobilePlanningView } from './MobilePlanningView';
 import AdminPanel from './AdminPanel';
 
 export function Planning() {
@@ -35,6 +36,31 @@ export function Planning() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showAdmin, setShowAdmin] = useState(false);
   const [tokenInput, setTokenInput] = useState(token);
+
+  // Fonction pour scroller vers la semaine courante
+  const scrollToCurrentWeek = () => {
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    const currentWeek = data.semaines?.find(semaine => {
+      const debut = new Date(semaine.debut);
+      const fin = new Date(semaine.fin);
+      const todayDate = new Date(today);
+      
+      return todayDate >= debut && todayDate <= fin;
+    });
+
+    if (currentWeek) {
+      const element = document.getElementById(`week-${currentWeek.id}`);
+      if (element) {
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest' 
+        });
+      }
+    }
+  };
 
   // Gestion du responsive
   useEffect(() => {
@@ -287,6 +313,7 @@ export function Planning() {
         onFilterChange={setFilters}
         data={data}
         isAdmin={isAdmin}
+        onScrollToCurrentWeek={scrollToCurrentWeek}
       />
 
       {/* Légende mobile */}
@@ -306,52 +333,17 @@ export function Planning() {
         </div>
       )}
 
-      {/* Layout principal avec sidebar et planning */}
-      <div className="main-layout">
-        {/* Sidebar des familles (visible si des familles existent) */}
-        {data.familles && data.familles.length > 0 && (
-          <FamiliesSidebar
-            familles={data.familles}
-            affectations={data.affectations}
-            classes={data.classes}
-            isAdmin={isAdmin}
-            filters={filters}
-            onFilterChange={setFilters}
-          />
-        )}
-
-        {/* Grille de planning */}
-        <div className="planning-container">
+      {/* Layout principal */}
+      {isMobile ? (
+        /* Vue mobile optimisée */
+        <div className="mobile-layout">
           {data.classes && data.classes.length > 0 ? (
-            <>
-              {/* Indicateur de classes */}
-              <div className="classes-indicator">
-                <span className="classes-count">
-                  🏠 {data.classes.length} classe{data.classes.length > 1 ? 's' : ''}
-                </span>
-                {data.classes.length > 5 && (
-                  <span className="scroll-hint">
-                    ↔️ Faites défiler horizontalement
-                  </span>
-                )}
-              </div>
-
-              <div className="planning-scroll-container">
-                <div className="planning-grid-wrapper">
-                  <PlanningHeader classes={data.classes} />
-                  <PlanningGrid 
-                    data={data}
-                    filters={filters}
-                    isAdmin={isAdmin}
-                    canEdit={canEdit}
-                    onCreateAffectation={createAffectation}
-                    onDeleteAffectation={deleteAffectation}
-                    onAutoDistribute={autoDistributeWeek}
-                    onTogglePublish={toggleSemainePublication}
-                  />
-                </div>
-              </div>
-            </>
+            <MobilePlanningView 
+              data={data}
+              filters={filters}
+              isAdmin={isAdmin}
+              canEdit={canEdit}
+            />
           ) : (
             <div className="empty-planning">
               <h3>📋 Planning vide</h3>
@@ -362,7 +354,65 @@ export function Planning() {
             </div>
           )}
         </div>
-      </div>
+      ) : (
+        /* Vue desktop avec sidebar et grille */
+        <div className="desktop-layout">
+          {/* Sidebar des familles (visible si des familles existent) */}
+          {data.familles && data.familles.length > 0 && (
+            <FamiliesSidebar
+              familles={data.familles}
+              affectations={data.affectations}
+              classes={data.classes}
+              isAdmin={isAdmin}
+              filters={filters}
+              onFilterChange={setFilters}
+            />
+          )}
+
+          {/* Grille de planning */}
+          <div className="planning-container">
+            {data.classes && data.classes.length > 0 ? (
+              <>
+                {/* Indicateur de classes */}
+                <div className="classes-indicator">
+                  <span className="classes-count">
+                    🏠 {data.classes.length} classe{data.classes.length > 1 ? 's' : ''}
+                  </span>
+                  {data.classes.length > 5 && (
+                    <span className="scroll-hint">
+                      ↔️ Faites défiler horizontalement
+                    </span>
+                  )}
+                </div>
+
+                <div className="planning-scroll-container">
+                  <div className="planning-grid-wrapper">
+                    <PlanningHeader classes={data.classes} />
+                    <PlanningGrid 
+                      data={data}
+                      filters={filters}
+                      isAdmin={isAdmin}
+                      canEdit={canEdit}
+                      onCreateAffectation={createAffectation}
+                      onDeleteAffectation={deleteAffectation}
+                      onAutoDistribute={autoDistributeWeek}
+                      onTogglePublish={toggleSemainePublication}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="empty-planning">
+                <h3>📋 Planning vide</h3>
+                <p>Aucune classe ou semaine n'a été configurée pour ce planning.</p>
+                {isAdmin && (
+                  <p>Utilisez l'interface d'administration pour configurer les classes et semaines.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .planning {
@@ -473,7 +523,11 @@ export function Planning() {
           font-weight: 500;
         }
 
-        .main-layout {
+        .mobile-layout {
+          width: 100%;
+        }
+
+        .desktop-layout {
           display: flex;
           gap: 0;
           min-height: 60vh;
