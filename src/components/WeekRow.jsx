@@ -3,14 +3,16 @@ import { AffectationCell } from './AffectationCell';
 import { formatDate } from '../utils/dateUtils';
 import { useToast } from './Toast';
 
-export function WeekRow({ semaine, classes, affectations, onAffectationMove, onFamilleDrop, onOverwriteRequest, isAdmin, canEdit, onAutoDistribute, onTogglePublish }) {
+export function WeekRow({ semaine, classes, affectations, allAffectations, onAffectationMove, onFamilleDrop, onOverwriteRequest, isAdmin, canEdit, onAutoDistribute, onTogglePublish }) {
   const isPublished = semaine.is_published;
   const [isDistributing, setIsDistributing] = useState(false);
   const toast = useToast();
 
-  // Calculer combien de classes sont libres pour CETTE semaine
-  const semaineAffectations = affectations.filter(a => a.semaineId === semaine.id);
-  const occupiedClasses = new Set(semaineAffectations.map(a => a.classeId));
+  // Calculer combien de classes sont libres pour CETTE semaine (utiliser toutes les affectations)
+  const realSemaineAffectations = allAffectations ? 
+    allAffectations.filter(a => a.semaineId === semaine.id) :
+    affectations.filter(a => a.semaineId === semaine.id);
+  const occupiedClasses = new Set(realSemaineAffectations.map(a => a.classeId));
   const freeClasses = classes.filter(classe => !occupiedClasses.has(classe.id));
   const isComplete = freeClasses.length === 0 && classes.length > 0;
   const canAutoDistribute = canEdit && freeClasses.length > 0;
@@ -95,16 +97,23 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
       {/* Zone scrollable avec affectations */}
       <div className="semaine-affectations">
         {classes.map(classe => {
+          // Affectation filtrée à afficher
           const cellAffectation = affectations.find(
             a => a.classeId === classe.id && a.semaineId === semaine.id
           );
           
+          // Affectation réelle (non-filtrée) pour déterminer si la cellule est occupée
+          const realAffectation = allAffectations ? allAffectations.find(
+            a => a.classeId === classe.id && a.semaineId === semaine.id
+          ) : cellAffectation;
+          
           return (
             <AffectationCell
-              key={`${semaine.id}-${classe.id}-${cellAffectation?.id || 'empty'}-${cellAffectation?._refreshKey || ''}`}
+              key={`${semaine.id}-${classe.id}-${cellAffectation?.id || realAffectation?.id || 'empty'}-${cellAffectation?._refreshKey || ''}`}
               classe={classe}
               semaine={semaine}
               affectation={cellAffectation}
+              realAffectation={realAffectation}
               onMove={onAffectationMove}
               onFamilleDrop={onFamilleDrop}
               onOverwriteRequest={onOverwriteRequest}
@@ -128,35 +137,47 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
         }
 
         .semaine-sidebar {
-          width: 240px;
-          min-width: 240px;
+          width: 320px;
+          min-width: 320px;
           background: #f8f9fa;
           border-right: 1px solid #ddd;
-          padding: 12px;
+          padding: 8px;
           display: flex;
-          flex-direction: column;
-          justify-content: space-between;
+          flex-direction: row;
+          align-items: center;
           gap: 8px;
           position: sticky;
           left: 0;
           z-index: 5;
+          min-height: 40px;
         }
 
         .semaine-info {
           flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
         }
 
         .semaine-actions {
           display: flex;
-          flex-direction: column;
-          gap: 6px;
+          flex-direction: row;
+          gap: 4px;
+          align-items: center;
+          flex-shrink: 0;
         }
 
         .semaine-dates {
           font-weight: 600;
           color: #333;
-          font-size: 13px;
-          line-height: 1.2;
+          font-size: 11px;
+          line-height: 1.1;
+          text-align: left;
+          background: rgba(255, 255, 255, 0.6);
+          padding: 3px 6px;
+          border-radius: 4px;
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          white-space: nowrap;
         }
 
 
@@ -164,12 +185,14 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
         .semaine-special {
           background: #e7f3ff;
           color: #0066cc;
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 11px;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-size: 10px;
           font-weight: 500;
-          margin-top: 4px;
           text-align: center;
+          width: 100%;
+          border: 1px solid rgba(0, 102, 204, 0.2);
+          margin-top: 2px;
         }
 
         .unpublished-badge {
@@ -183,14 +206,15 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
 
         .publish-toggle-btn {
           border: none;
-          border-radius: 6px;
-          padding: 8px 12px;
-          font-size: 12px;
+          border-radius: 4px;
+          padding: 4px 6px;
+          font-size: 10px;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-          width: 100%;
           text-align: center;
+          white-space: nowrap;
+          min-width: 70px;
         }
 
         .publish-toggle-btn.published {
@@ -214,15 +238,16 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
           background: linear-gradient(135deg, #28a745, #20c997);
           color: white;
           border: none;
-          padding: 8px 12px;
-          border-radius: 6px;
-          font-size: 12px;
+          padding: 4px 6px;
+          border-radius: 4px;
+          font-size: 10px;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s ease;
-          width: 100%;
           text-align: center;
           box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+          white-space: nowrap;
+          min-width: 50px;
         }
 
         .auto-distribute-btn:hover:not(:disabled) {
@@ -240,9 +265,12 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
           background: #d4edda;
           color: #155724;
           padding: 2px 6px;
-          border-radius: 4px;
+          border-radius: 3px;
           font-size: 10px;
           font-weight: 500;
+          text-align: center;
+          white-space: nowrap;
+          min-width: 50px;
         }
 
         .semaine-affectations {
@@ -252,6 +280,7 @@ export function WeekRow({ semaine, classes, affectations, onAffectationMove, onF
           flex: 1;
           background: #ddd;
           overflow-x: auto;
+          box-sizing: border-box;
         }
 
         @media (max-width: 768px) {

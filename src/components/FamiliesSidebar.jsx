@@ -62,19 +62,29 @@ function FamilleItem({ famille, isAdmin, currentAffectations, classes }) {
   );
 }
 
-export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filters, onFilterChange }) {
+export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filters, onFilterChange, onCollapseChange }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [familySearch, setFamilySearch] = useState('');
+
+  // Notifier le parent quand l'état collapse change
+  const handleToggleCollapse = () => {
+    const newCollapsed = !collapsed;
+    setCollapsed(newCollapsed);
+    if (onCollapseChange) {
+      onCollapseChange(newCollapsed);
+    }
+  };
 
   // Calculer le nombre d'affectations actuelles pour chaque famille
   const getFamilleAffectationsCount = (familleId) => {
     return affectations.filter(aff => aff.familleId === familleId).length;
   };
 
-  // Filtrer les familles selon la recherche
+  // Filtrer les familles selon la recherche locale
   const filteredFamilles = familles.filter(famille => {
     if (!famille.is_active) return false; // Masquer les archivées
-    if (filters.search) {
-      return famille.nom.toLowerCase().includes(filters.search.toLowerCase());
+    if (familySearch.trim()) {
+      return famille.nom.toLowerCase().includes(familySearch.toLowerCase());
     }
     return true;
   });
@@ -91,37 +101,53 @@ export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filt
 
   return (
     <div className={`families-sidebar ${collapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-header">
-        <h4>
-          👨‍👩‍👧‍👦 Familles ({filteredFamilles.length})
-        </h4>
-        <button 
-          className="collapse-btn"
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          {collapsed ? '→' : '←'}
-        </button>
+      {/* Zone sticky avec header et recherche */}
+      <div className="sticky-header">
+        <div className="sidebar-header">
+          <h4>
+            👨‍👩‍👧‍👦 Familles ({filteredFamilles.length}{familySearch ? ` / ${familles.filter(f => f.is_active).length}` : ''})
+            {familySearch && <span className="search-indicator">🔍</span>}
+          </h4>
+          <button 
+            className="collapse-btn"
+            onClick={handleToggleCollapse}
+          >
+            {collapsed ? '→' : '←'}
+          </button>
+        </div>
+
+        {!collapsed && (
+          <>
+            {/* Barre de recherche des familles */}
+            <div className="search-bar">
+              <input
+                type="text"
+                placeholder="🔍 Rechercher une famille..."
+                value={familySearch}
+                onChange={(e) => setFamilySearch(e.target.value)}
+              />
+              {familySearch && (
+                <button 
+                  className="clear-search-btn"
+                  onClick={() => setFamilySearch('')}
+                  title="Effacer la recherche"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {isAdmin && (
+              <div className="drag-instructions">
+                🎯 <em>Glissez une famille vers une cellule du planning</em>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {!collapsed && (
-        <>
-          {/* Barre de recherche */}
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Rechercher une famille..."
-              value={filters.search || ''}
-              onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
-            />
-          </div>
-
-          {isAdmin && (
-            <div className="drag-instructions">
-              🎯 <em>Glissez une famille vers une cellule du planning</em>
-            </div>
-          )}
-
-          <div className="families-list">
+        <div className="families-list">
             {/* Familles avec préférences */}
             {famillesAvecPreferences.length > 0 && (
               <div className="families-group">
@@ -162,8 +188,7 @@ export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filt
                 )}
               </div>
             )}
-          </div>
-        </>
+        </div>
       )}
 
       <style jsx>{`
@@ -172,29 +197,70 @@ export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filt
           background: white;
           border-right: 1px solid #ddd;
           height: 100vh;
-          overflow-y: auto;
-          position: sticky;
+          position: fixed;
           top: 0;
+          left: 0;
           transition: width 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          z-index: 100;
+          overflow: hidden;
+          box-sizing: border-box;
         }
 
         .families-sidebar.collapsed {
           width: 50px;
         }
 
-        .sidebar-header {
-          padding: 16px;
+        .families-sidebar.collapsed .sidebar-header {
+          padding: 8px 4px;
+          justify-content: center;
+        }
+
+        .families-sidebar.collapsed .sidebar-header h4 {
+          display: none;
+        }
+
+        .families-sidebar.collapsed .collapse-btn {
+          margin: 0;
+        }
+
+        .sticky-header {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: white;
           border-bottom: 1px solid #eee;
+        }
+
+        .sidebar-header {
+          padding: 16px 12px;
           background: #f8f9fa;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          flex-shrink: 0;
+          box-sizing: border-box;
+          overflow: hidden;
         }
 
         .sidebar-header h4 {
           margin: 0;
           color: #333;
           font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          flex: 1;
+          min-width: 0;
+        }
+
+        .search-indicator {
+          font-size: 12px;
+          color: #007bff;
         }
 
         .collapse-btn {
@@ -212,16 +278,51 @@ export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filt
         }
 
         .search-bar {
-          padding: 12px;
-          border-bottom: 1px solid #eee;
+          padding: 12px 8px;
+          background: white;
+          flex-shrink: 0;
+          position: relative;
+          box-sizing: border-box;
         }
 
         .search-bar input {
           width: 100%;
-          padding: 8px;
+          padding: 8px 26px 8px 8px;
           border: 1px solid #ddd;
           border-radius: 4px;
           font-size: 14px;
+          outline: none;
+          box-sizing: border-box;
+        }
+
+        .search-bar input:focus {
+          border-color: #007bff;
+          box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .clear-search-btn {
+          position: absolute;
+          right: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #999;
+          font-size: 12px;
+          padding: 2px;
+          border-radius: 50%;
+          width: 18px;
+          height: 18px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+
+        .clear-search-btn:hover {
+          background: #f8f9fa;
+          color: #666;
         }
 
         .drag-instructions {
@@ -230,10 +331,14 @@ export function FamiliesSidebar({ familles, affectations, classes, isAdmin, filt
           border-bottom: 1px solid #bee5eb;
           font-size: 12px;
           color: #0c5460;
+          flex-shrink: 0;
         }
 
         .families-list {
           padding: 8px;
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
         }
 
         .families-group {

@@ -36,6 +36,7 @@ export function Planning() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [showAdmin, setShowAdmin] = useState(false);
   const [tokenInput, setTokenInput] = useState(token);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Fonction pour scroller vers la semaine courante
   const scrollToCurrentWeek = () => {
@@ -356,7 +357,7 @@ export function Planning() {
         </div>
       ) : (
         /* Vue desktop avec sidebar et grille */
-        <div className="desktop-layout">
+        <div className={`desktop-layout ${data.familles && data.familles.length > 0 ? (sidebarCollapsed ? 'sidebar-collapsed' : '') : 'no-sidebar'}`}>
           {/* Sidebar des familles (visible si des familles existent) */}
           {data.familles && data.familles.length > 0 && (
             <FamiliesSidebar
@@ -366,6 +367,7 @@ export function Planning() {
               isAdmin={isAdmin}
               filters={filters}
               onFilterChange={setFilters}
+              onCollapseChange={setSidebarCollapsed}
             />
           )}
 
@@ -531,6 +533,16 @@ export function Planning() {
           display: flex;
           gap: 0;
           min-height: 60vh;
+          margin-left: 300px; /* Compensation pour la sidebar fixe */
+          transition: margin-left 0.3s ease;
+        }
+
+        .desktop-layout.sidebar-collapsed {
+          margin-left: 50px; /* Marge réduite quand sidebar collapsed */
+        }
+
+        .desktop-layout.no-sidebar {
+          margin-left: 0; /* Pas de marge si pas de sidebar */
         }
 
         .planning-container {
@@ -591,7 +603,7 @@ export function Planning() {
         }
 
         .planning-grid-wrapper {
-          min-width: ${data.classes?.length ? data.classes.length * 150 + 180 : 800}px;
+          min-width: ${data.classes?.length ? data.classes.length * 150 + 320 : 940}px;
           width: 100%;
         }
 

@@ -4,9 +4,6 @@ export function PlanningHeader({ classes }) {
   return (
     <>
       <div className="planning-header">
-        {/* Colonne vide correspondant à la sidebar des semaines */}
-        <div className="semaines-header-spacer"></div>
-        
         {/* Colonnes des classes */}
         <div className="classes-header-grid">
           {classes.map(classe => (
@@ -34,7 +31,6 @@ export function PlanningHeader({ classes }) {
 
       <style jsx>{`
         .planning-header {
-          display: flex;
           position: sticky;
           top: 0;
           z-index: 10;
@@ -42,31 +38,13 @@ export function PlanningHeader({ classes }) {
           background: white;
         }
         
-        .semaines-header-spacer {
-          width: 240px;
-          min-width: 240px;
-          background: #f8f9fa;
-          border-right: 1px solid #ddd;
-          border-bottom: 1px solid #ddd;
-          padding: 12px;
-          font-weight: 600;
-          text-align: center;
-          color: #333;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        
-        .semaines-header-spacer::before {
-          content: "Semaines";
-        }
-        
         .classes-header-grid {
           display: grid;
           grid-template-columns: repeat(${classes.length}, minmax(150px, 1fr));
           gap: 1px;
           background: #ddd;
-          flex: 1;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .classe-header {
@@ -84,6 +62,7 @@ export function PlanningHeader({ classes }) {
           position: relative;
           white-space: nowrap;
           overflow: hidden;
+          box-sizing: border-box;
         }
 
         .classe-nom {
