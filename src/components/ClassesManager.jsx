@@ -10,6 +10,7 @@ function ClassesManager({ token, canEdit, refreshData }) {
   const toast = useToast();
   const { confirm, confirmState, closeConfirm } = useConfirm();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingClasse, setEditingClasse] = useState(null);
   const [importFile, setImportFile] = useState(null);
   const [importResult, setImportResult] = useState(null);
 
@@ -97,6 +98,60 @@ function ClassesManager({ token, canEdit, refreshData }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditClasse = (classe) => {
+    setEditingClasse({ ...classe });
+    setShowAddForm(false);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingClasse.nom.trim()) {
+      setError('Le nom de la classe est obligatoire');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/planning', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          type: 'classe',
+          id: editingClasse.id,
+          data: {
+            nom: editingClasse.nom,
+            couleur: editingClasse.couleur,
+            ordre: editingClasse.ordre,
+            description: editingClasse.description,
+            instructions_pdf_url: editingClasse.instructions_pdf_url
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la modification');
+      }
+
+      setEditingClasse(null);
+      await loadClasses();
+      toast.success(`Classe "${editingClasse.id}" modifiée avec succès`);
+    } catch (err) {
+      setError(err.message);
+      toast.error(`Erreur lors de la modification: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingClasse(null);
   };
 
   const handleDeleteClasse = async (classeId) => {
@@ -435,6 +490,98 @@ function ClassesManager({ token, canEdit, refreshData }) {
         </div>
       )}
 
+      {/* Formulaire d'édition */}
+      {editingClasse && (
+        <div className="add-form">
+          <h4>✏️ Modifier la Classe {editingClasse.id}</h4>
+          <form onSubmit={handleSaveEdit}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>ID classe (non modifiable)</label>
+                <input
+                  type="text"
+                  value={editingClasse.id}
+                  disabled
+                  className="disabled-input"
+                />
+              </div>
+              <div className="form-group">
+                <label>Ordre d'affichage</label>
+                <input
+                  type="number"
+                  value={editingClasse.ordre}
+                  onChange={(e) => setEditingClasse({ ...editingClasse, ordre: parseInt(e.target.value) })}
+                  min="0"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Nom de la classe *</label>
+              <input
+                type="text"
+                value={editingClasse.nom}
+                onChange={(e) => setEditingClasse({ ...editingClasse, nom: e.target.value })}
+                placeholder="Partie A - Rez-de-chaussée"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Couleur</label>
+              <div className="color-selection">
+                <input
+                  type="color"
+                  value={editingClasse.couleur}
+                  onChange={(e) => setEditingClasse({ ...editingClasse, couleur: e.target.value })}
+                />
+                <div className="predefined-colors">
+                  {couleursPredefinies.map(couleur => (
+                    <button
+                      key={couleur}
+                      type="button"
+                      className={`color-btn ${editingClasse.couleur === couleur ? 'active' : ''}`}
+                      style={{ backgroundColor: couleur }}
+                      onClick={() => setEditingClasse({ ...editingClasse, couleur })}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                value={editingClasse.description}
+                onChange={(e) => setEditingClasse({ ...editingClasse, description: e.target.value })}
+                placeholder="Description de la classe..."
+                rows="3"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>URL Instructions PDF</label>
+              <input
+                type="url"
+                value={editingClasse.instructions_pdf_url}
+                onChange={(e) => setEditingClasse({ ...editingClasse, instructions_pdf_url: e.target.value })}
+                placeholder="https://example.com/instructions.pdf"
+              />
+              <small>URL vers un PDF avec les instructions de nettoyage pour cette classe</small>
+            </div>
+
+            <div className="form-actions">
+              <button type="button" onClick={handleCancelEdit}>
+                Annuler
+              </button>
+              <button type="submit" disabled={loading}>
+                {loading ? 'Modification...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Liste des classes */}
       <div className="classes-list">
         <div className="list-header">
@@ -455,13 +602,22 @@ function ClassesManager({ token, canEdit, refreshData }) {
                     <h5>{classe.nom}</h5>
                     <span className="ordre">Ordre: {classe.ordre}</span>
                   </div>
-                  <button
-                    onClick={() => handleDeleteClasse(classe.id)}
-                    className="delete-btn"
-                    title="Supprimer"
-                  >
-                    🗑️
-                  </button>
+                  <div className="classe-actions">
+                    <button
+                      onClick={() => handleEditClasse(classe)}
+                      className="edit-btn"
+                      title="Modifier"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClasse(classe.id)}
+                      className="delete-btn"
+                      title="Supprimer"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 </div>
                 
                 {classe.description && (
@@ -654,6 +810,25 @@ function ClassesManager({ token, canEdit, refreshData }) {
           color: #666;
         }
 
+        .classe-actions {
+          display: flex;
+          gap: 4px;
+        }
+
+        .edit-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 16px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+
+        .edit-btn:hover {
+          background: #e2e3e5;
+        }
+
         .delete-btn {
           background: none;
           border: none;
@@ -666,6 +841,11 @@ function ClassesManager({ token, canEdit, refreshData }) {
 
         .delete-btn:hover {
           background: #f8d7da;
+        }
+
+        .disabled-input {
+          background: #e9ecef !important;
+          opacity: 0.6;
         }
 
         .classe-description {

@@ -12,6 +12,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingFamille, setEditingFamille] = useState(null);
   const [importFile, setImportFile] = useState(null);
   const [importResult, setImportResult] = useState(null);
   const [selectedFamilleForExclusions, setSelectedFamilleForExclusions] = useState(null);
@@ -110,6 +111,61 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEditFamille = (famille) => {
+    setEditingFamille({ ...famille });
+    setShowAddForm(false);
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingFamille.nom.trim() || !editingFamille.telephone.trim()) {
+      setError('Nom et téléphone sont obligatoires');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/familles', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          action: 'update',
+          id: editingFamille.id,
+          data: {
+            nom: editingFamille.nom,
+            email: editingFamille.email,
+            telephone: editingFamille.telephone,
+            nb_nettoyage: editingFamille.nb_nettoyage,
+            classes_preferences: editingFamille.classes_preferences,
+            notes: editingFamille.notes
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la modification');
+      }
+
+      setEditingFamille(null);
+      await loadFamilles();
+      toast.success(`Famille "${editingFamille.nom}" modifiée avec succès`);
+    } catch (err) {
+      setError(err.message);
+      toast.error(`Erreur lors de la modification: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingFamille(null);
   };
 
   const handleImport = async () => {
@@ -548,6 +604,108 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         </div>
       )}
 
+      {/* Formulaire d'édition */}
+      {editingFamille && (
+        <div className="add-form">
+          <h4>✏️ Modifier la Famille {editingFamille.nom}</h4>
+          <form onSubmit={handleSaveEdit}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Nom famille *</label>
+                <input
+                  type="text"
+                  value={editingFamille.nom}
+                  onChange={(e) => setEditingFamille({ ...editingFamille, nom: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={editingFamille.email}
+                  onChange={(e) => setEditingFamille({ ...editingFamille, email: e.target.value })}
+                  placeholder="famille@example.com"
+                />
+              </div>
+            </div>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label>Téléphone *</label>
+                <input
+                  type="tel"
+                  value={editingFamille.telephone}
+                  onChange={(e) => setEditingFamille({ ...editingFamille, telephone: e.target.value })}
+                  placeholder="0612345678"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Nombre de nettoyages/an</label>
+                <input
+                  type="number"
+                  value={editingFamille.nb_nettoyage}
+                  onChange={(e) => setEditingFamille({ ...editingFamille, nb_nettoyage: parseInt(e.target.value) || 0 })}
+                  min="0"
+                  max="50"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Préférences de classes</label>
+              <div className="preferences-selection">
+                {classes.map(classe => (
+                  <label key={classe.id} className="preference-item">
+                    <input
+                      type="checkbox"
+                      checked={editingFamille.classes_preferences?.includes(classe.id) || false}
+                      onChange={(e) => {
+                        const prefs = editingFamille.classes_preferences || [];
+                        if (e.target.checked) {
+                          setEditingFamille({ 
+                            ...editingFamille, 
+                            classes_preferences: [...prefs, classe.id] 
+                          });
+                        } else {
+                          setEditingFamille({ 
+                            ...editingFamille, 
+                            classes_preferences: prefs.filter(p => p !== classe.id) 
+                          });
+                        }
+                      }}
+                    />
+                    <span className="preference-class" style={{ backgroundColor: classe.couleur }}>
+                      {classe.nom}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea
+                value={editingFamille.notes || ''}
+                onChange={(e) => setEditingFamille({ ...editingFamille, notes: e.target.value })}
+                placeholder="Notes additionnelles..."
+                rows="3"
+              />
+            </div>
+
+            <div className="form-actions">
+              <button type="button" onClick={handleCancelEdit}>
+                Annuler
+              </button>
+              <button type="submit" disabled={loading}>
+                {loading ? 'Modification...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Liste des familles */}
       <div className="familles-list">
         <h4>👨‍👩‍👧‍👦 Familles ({familles.length})</h4>
@@ -560,6 +718,14 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
                 <div className="famille-header">
                   <h5>{famille.nom}</h5>
                   <div className="famille-actions">
+                    <button
+                      onClick={() => handleEditFamille(famille)}
+                      className="edit-btn"
+                      disabled={!canEdit}
+                      title="Modifier cette famille"
+                    >
+                      ✏️
+                    </button>
                     <button
                       onClick={() => handleSendSMSToFamille(famille)}
                       className="sms-btn"
@@ -961,6 +1127,26 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         .btn-sms {
           background: #17a2b8;
           color: white;
+        }
+
+        .edit-btn {
+          background: #6c757d;
+          color: white;
+          padding: 4px 8px;
+          border: none;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: background 0.2s;
+        }
+
+        .edit-btn:hover:not(:disabled) {
+          background: #545b62;
+        }
+
+        .edit-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
         }
 
         .sms-btn {

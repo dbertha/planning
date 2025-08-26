@@ -488,8 +488,8 @@ async function handlePut(req, res) {
 
       case 'classe':
         const classeResult = await query(
-          'UPDATE classes SET nom = $1, couleur = $2, ordre = $3, description = $4 WHERE id = $5 AND planning_id = $6 RETURNING *',
-          [data.nom, data.couleur, data.ordre, data.description, id, planning.id]
+          'UPDATE classes SET nom = $1, couleur = $2, ordre = $3, description = $4, instructions_pdf_url = $5 WHERE id = $6 AND planning_id = $7 RETURNING *',
+          [data.nom, data.couleur, data.ordre, data.description, data.instructions_pdf_url, id, planning.id]
         );
         if (classeResult.rows.length === 0) {
           return res.status(404).json({ error: 'Classe non trouvée' });
