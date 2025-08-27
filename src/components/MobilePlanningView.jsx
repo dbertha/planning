@@ -185,11 +185,6 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
                           <div className="assignment-family">
                             {affectation.familleNom}
                           </div>
-                          {affectation.notes && (
-                            <div className="assignment-notes">
-                              💬 {affectation.notes}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
@@ -372,12 +367,7 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
           margin-bottom: 4px;
         }
 
-        .assignment-notes {
-          font-size: 13px;
-          color: #666;
-          font-style: italic;
-          margin-top: 4px;
-        }
+
 
         /* Scroll smooth pour navigation */
         :global(html) {

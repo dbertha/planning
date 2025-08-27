@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
-export function PlanningHeader({ classes }) {
+export const PlanningHeader = forwardRef(({ classes }, ref) => {
   return (
     <>
-      <div className="planning-header">
+      <div ref={ref} className="classes-header">
         {/* Colonnes des classes */}
         <div className="classes-header-grid">
           {classes.map(classe => (
@@ -30,11 +30,7 @@ export function PlanningHeader({ classes }) {
       </div>
 
       <style jsx>{`
-        .planning-header {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        .classes-header {
           background: white;
         }
         
@@ -108,4 +104,4 @@ export function PlanningHeader({ classes }) {
       `}</style>
     </>
   );
-} 
+}); 

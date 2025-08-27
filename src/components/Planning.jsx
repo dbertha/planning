@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlanningData } from '../hooks/usePlanningData';
 import { PlanningHeader } from './PlanningHeader';
+import { StickyClassesHeader } from './StickyClassesHeader';
 import { PlanningGrid } from './PlanningGrid';
 import { ViewSelector } from './ViewSelector';
 import { FamiliesSidebar } from './FamiliesSidebar';
@@ -13,6 +14,9 @@ export function Planning() {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('token') || '';
   });
+  
+  // Ref pour l'en-tête des classes original
+  const originalHeaderRef = useRef(null);
 
   const { 
     data, 
@@ -261,7 +265,17 @@ export function Planning() {
   );
 
   return (
-    <div className="planning">
+    <>
+      {/* Shadow header sticky qui apparaît quand l'original n'est plus visible */}
+      {!isMobile && data.classes && data.classes.length > 0 && (
+        <StickyClassesHeader 
+          classes={data.classes} 
+          originalHeaderRef={originalHeaderRef}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+      )}
+      
+      <div className="planning">
       {/* Header avec informations du planning */}
       <div className="planning-header">
         <div className="planning-info">
@@ -391,7 +405,7 @@ export function Planning() {
 
                 <div className="planning-scroll-container">
                   <div className="planning-grid-wrapper">
-                    <PlanningHeader classes={data.classes} />
+                    <PlanningHeader ref={originalHeaderRef} classes={data.classes} />
                     <PlanningGrid 
                       data={data}
                       filters={filters}
@@ -423,6 +437,7 @@ export function Planning() {
           max-width: 1400px;
           margin: 0 auto;
           padding: 20px;
+          padding-bottom: 60px; /* Espace en bas pour le scroll naturel */
         }
 
         .planning-header {
@@ -534,9 +549,9 @@ export function Planning() {
         .desktop-layout {
           display: flex;
           gap: 0;
-          min-height: 60vh;
           margin-left: 300px; /* Compensation pour la sidebar fixe */
           transition: margin-left 0.3s ease;
+          min-height: 100vh;
         }
 
         .desktop-layout.sidebar-collapsed {
@@ -552,9 +567,9 @@ export function Planning() {
           background: white;
           border-radius: 8px;
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          overflow: hidden;
           display: flex;
           flex-direction: column;
+          min-height: 0;
         }
 
         .classes-indicator {
@@ -626,7 +641,7 @@ export function Planning() {
 
           .planning-scroll-container {
             overflow-x: auto;
-            overflow-y: hidden;
+            overflow-y: visible;
             -webkit-overflow-scrolling: touch;
           }
 
@@ -708,5 +723,6 @@ export function Planning() {
         }
       `}</style>
     </div>
+    </>
   );
 } 
