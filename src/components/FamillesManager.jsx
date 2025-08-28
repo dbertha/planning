@@ -26,6 +26,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
     nom: '',
     email: '',
     telephone: '',
+    telephone2: '',
     nb_nettoyage: 3,
     classes_preferences: [],
     notes: ''
@@ -99,6 +100,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         nom: '',
         email: '',
         telephone: '',
+        telephone2: '',
         nb_nettoyage: 3,
         classes_preferences: [],
         notes: ''
@@ -542,6 +544,15 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
                   required
                 />
               </div>
+              <div className="form-group">
+                <label>Téléphone 2</label>
+                <input
+                  type="tel"
+                  value={newFamille.telephone2}
+                  onChange={(e) => setNewFamille({ ...newFamille, telephone2: e.target.value })}
+                  placeholder="Deuxième numéro (optionnel)"
+                />
+              </div>
             </div>
 
             <div className="form-row">
@@ -639,6 +650,15 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
                   onChange={(e) => setEditingFamille({ ...editingFamille, telephone: e.target.value })}
                   placeholder="0612345678"
                   required
+                />
+              </div>
+              <div className="form-group">
+                <label>Téléphone 2</label>
+                <input
+                  type="tel"
+                  value={editingFamille.telephone2 || ''}
+                  onChange={(e) => setEditingFamille({ ...editingFamille, telephone2: e.target.value })}
+                  placeholder="Deuxième numéro (optionnel)"
                 />
               </div>
               <div className="form-group">
@@ -763,6 +783,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
                 
                 <div className="famille-info">
                   <span>📞 {famille.telephone}</span>
+                  {famille.telephone2 && <span>📞 {famille.telephone2}</span>}
                   {famille.email && <span>📧 {famille.email}</span>}
                   <span>🔢 {famille.nb_nettoyage} nettoyages/an</span>
                   <span>📊 {famille.nb_affectations || 0} affectations</span>

@@ -95,6 +95,7 @@ export const initDatabase = async () => {
         nom TEXT NOT NULL,
         email TEXT,
         telephone TEXT NOT NULL, -- OBLIGATOIRE pour les SMS
+        telephone2 TEXT, -- Deuxième numéro de téléphone (optionnel)
         nb_nettoyage INTEGER DEFAULT 3,
         classes_preferences TEXT[], -- Array des IDs de classes préférées
         notes TEXT,
@@ -103,6 +104,11 @@ export const initDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(nom, planning_id) -- Éviter les doublons de famille par planning
       );
+    `);
+
+    // Migration: Ajouter la colonne telephone2 si elle n'existe pas
+    await query(`
+      ALTER TABLE familles ADD COLUMN IF NOT EXISTS telephone2 TEXT;
     `);
 
     // Table des exclusions temporelles des familles (sans motif)

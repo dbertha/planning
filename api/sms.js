@@ -8,6 +8,9 @@
 import { validateTokenAndGetPlanning } from './db.js';
 import { query } from './db.js';
 import { createScheduledSMS, getScheduledSMSList, updateScheduledSMS, deleteScheduledSMS, getScheduledSMSToExecute } from './db.js';
+import { famillesQueries, enrichedQueries } from './queries.js';
+import { handleApiError } from './errorHandlers.js';
+import { corsMiddlewareSMS } from './middleware.js';
 
 const SPRYNG_BASE_URL = 'https://rest.spryngsms.com/v1';
 const TWILIO_BASE_URL = 'https://api.twilio.com/2010-04-01';
@@ -63,10 +66,62 @@ const SMS_TEMPLATES = {
 };
 
 /**
+ * Classe de base pour les services SMS
+ */
+class BaseSMSService {
+  constructor() {
+    this.provider = 'base';
+  }
+
+  /**
+   * Méthode abstraite pour valider la configuration - à implémenter par les sous-classes
+   */
+  validateConfig() {
+    throw new Error('validateConfig doit être implémentée par la sous-classe');
+  }
+
+  /**
+   * Méthode abstraite pour tester la connexion - à implémenter par les sous-classes
+   */
+  async testConnection() {
+    throw new Error('testConnection doit être implémentée par la sous-classe');
+  }
+
+  /**
+   * Méthode abstraite pour envoyer un SMS - à implémenter par les sous-classes
+   */
+  async sendSMS(to, message, options = {}) {
+    throw new Error('sendSMS doit être implémentée par la sous-classe');
+  }
+
+  /**
+   * Méthode commune pour générer un message à partir d'un template
+   */
+  generateMessage(templateKey, data) {
+    const template = SMS_TEMPLATES[templateKey];
+    if (!template) {
+      throw new Error(`Template SMS inconnu: ${templateKey}`);
+    }
+
+    let message = template.template;
+    
+    // Remplacer les variables dans le template
+    Object.keys(data).forEach(key => {
+      const placeholder = `{${key}}`;
+      message = message.replace(new RegExp(placeholder, 'g'), data[key] || '');
+    });
+
+    return message;
+  }
+}
+
+/**
  * Classe pour la gestion des SMS via Spryng
  */
-class SpryngSMSService {
+class SpryngSMSService extends BaseSMSService {
   constructor() {
+    super();
+    this.provider = 'spryng';
     this.apiKey = SMS_CONFIG.spryng.apiKey;
     this.sender = SMS_CONFIG.spryng.sender;
   }
@@ -224,32 +279,15 @@ class SpryngSMSService {
     }
   }
 
-  /**
-   * Générer un message à partir d'un template
-   */
-  generateMessage(templateKey, data) {
-    const template = SMS_TEMPLATES[templateKey];
-    if (!template) {
-      throw new Error(`Template SMS inconnu: ${templateKey}`);
-    }
-
-    let message = template.template;
-    
-    // Remplacer les variables dans le template
-    Object.keys(data).forEach(key => {
-      const placeholder = `{${key}}`;
-      message = message.replace(new RegExp(placeholder, 'g'), data[key] || '');
-    });
-
-    return message;
-  }
 }
 
 /**
  * Classe pour la gestion des SMS via Twilio
  */
-class TwilioSMSService {
+class TwilioSMSService extends BaseSMSService {
   constructor() {
+    super();
+    this.provider = 'twilio';
     this.accountSid = SMS_CONFIG.twilio.accountSid;
     this.authToken = SMS_CONFIG.twilio.authToken;
     this.phoneNumber = SMS_CONFIG.twilio.phoneNumber;
@@ -423,7 +461,7 @@ class TwilioSMSService {
   }
 
   /**
-   * Remplacer les variables dans un template SMS
+   * Remplacer les variables dans un template SMS (méthode legacy, utilisez generateMessage)
    */
   replaceTemplateVariables(message, data) {
     const placeholders = [
@@ -433,26 +471,6 @@ class TwilioSMSService {
 
     placeholders.forEach(placeholder => {
       const key = placeholder.replace(/{|}/g, '');
-      message = message.replace(new RegExp(placeholder, 'g'), data[key] || '');
-    });
-
-    return message;
-  }
-
-  /**
-   * Générer un message à partir d'un template (même interface que Spryng)
-   */
-  generateMessage(templateKey, data) {
-    const template = SMS_TEMPLATES[templateKey];
-    if (!template) {
-      throw new Error(`Template SMS inconnu: ${templateKey}`);
-    }
-
-    let message = template.template;
-    
-    // Remplacer les variables dans le template
-    Object.keys(data).forEach(key => {
-      const placeholder = `{${key}}`;
       message = message.replace(new RegExp(placeholder, 'g'), data[key] || '');
     });
 
@@ -482,35 +500,17 @@ export function createSMSService() {
  * Fonctions utilitaires pour récupérer les données
  */
 async function getFamilleById(familleId, planningId) {
-  const result = await query(
-    'SELECT * FROM familles WHERE id = $1 AND planning_id = $2',
-    [familleId, planningId]
-  );
+  const result = await famillesQueries.getById(familleId, planningId);
   return result.rows[0];
 }
 
 async function getFamillesWithAffectations(planningId, semaineId) {
-  const result = await query(`
-    SELECT 
-      f.id, f.nom, f.telephone, f.email,
-      c.nom as classe_nom, c.couleur as classe_couleur,
-      s.debut, s.fin, s.description as semaine_description,
-      a.notes as affectation_notes
-    FROM familles f
-    JOIN affectations a ON f.id = a.famille_id
-    JOIN classes c ON a.classe_id = c.id AND a.planning_id = c.planning_id
-    JOIN semaines s ON a.semaine_id = s.id AND a.planning_id = s.planning_id
-    WHERE f.planning_id = $1 AND s.id = $2 AND f.is_active = true
-  `, [planningId, semaineId]);
-  
+  const result = await enrichedQueries.getFamillesWithAffectations(planningId, semaineId);
   return result.rows;
 }
 
 async function getAllFamillesActive(planningId) {
-  const result = await query(
-    'SELECT * FROM familles WHERE planning_id = $1 AND is_active = true ORDER BY nom',
-    [planningId]
-  );
+  const result = await famillesQueries.getAll(planningId, true);
   return result.rows;
 }
 
@@ -542,6 +542,25 @@ async function handlePost(req, res) {
         name: 'Planning Test', 
         token: 'test-token' 
       };
+    }
+
+    // Vérifier les permissions admin pour les actions d'envoi SMS
+    const adminActions = ['send_to_famille', 'send_to_affectations', 'send_bulk', 'create_scheduled', 'update_scheduled', 'delete_scheduled'];
+    if (adminActions.includes(action) && !isTestAction) {
+      const adminSession = req.headers['x-admin-session'];
+      if (!adminSession) {
+        return res.status(401).json({ error: 'Session admin requise pour envoyer des SMS' });
+      }
+      
+      // Vérifier que la session admin est valide
+      const sessionResult = await query(
+        'SELECT * FROM admin_sessions WHERE session_token = $1 AND expires_at > NOW()',
+        [adminSession]
+      );
+      
+      if (sessionResult.rows.length === 0) {
+        return res.status(401).json({ error: 'Session admin invalide ou expirée' });
+      }
     }
 
     const smsService = createSMSService();
@@ -594,6 +613,59 @@ async function handlePost(req, res) {
 }
 
 /**
+ * Fonction utilitaire pour envoyer SMS à tous les téléphones d'une famille
+ */
+async function sendSMSToAllFamillePhones(smsService, famille, message) {
+  const results = [];
+  let sent = 0;
+  let errors = 0;
+
+  // Collecter tous les numéros valides
+  const phones = [];
+  if (famille.telephone) phones.push(famille.telephone);
+  if (famille.telephone2) phones.push(famille.telephone2);
+
+  if (phones.length === 0) {
+    return {
+      sent: 0,
+      errors: 1,
+      results: [{
+        telephone: null,
+        success: false,
+        error: 'Aucun numéro de téléphone disponible'
+      }]
+    };
+  }
+
+  // Envoyer à chaque numéro
+  for (const phone of phones) {
+    try {
+      const result = await smsService.sendSMS(phone, message);
+      results.push({
+        telephone: phone,
+        phone: phone, // Alias pour compatibilité tests
+        success: true,
+        messageId: result.messageId,
+        cost: result.cost,
+        testMode: result.testMode,
+        // Transmettre toutes les autres propriétés du résultat SMS
+        ...result
+      });
+      sent++;
+    } catch (error) {
+      results.push({
+        telephone: phone,
+        success: false,
+        error: error.message
+      });
+      errors++;
+    }
+  }
+
+  return { sent, errors, results };
+}
+
+/**
  * Envoyer SMS à une famille spécifique
  */
 async function sendToFamille(res, smsService, planning, data) {
@@ -615,11 +687,10 @@ async function sendToFamille(res, smsService, planning, data) {
       return res.status(404).json({ error: 'Famille non trouvée' });
     }
 
-    if (!famille.telephone) {
-      return res.status(400).json({ error: 'Numéro de téléphone manquant pour cette famille' });
+    if (!famille.telephone && !famille.telephone2) {
+      return res.status(400).json({ error: 'Aucun numéro de téléphone disponible pour cette famille' });
     }
     
-    telephone = famille.telephone;
     nom_famille = famille.nom;
   }
 
@@ -635,22 +706,93 @@ async function sendToFamille(res, smsService, planning, data) {
     message = smsService.generateMessage(template_key, templateData);
   }
 
-  const result = await smsService.sendSMS(telephone, message);
-  
-  res.json({
-    success: true,
-    sent: 1,
-    results: [result],
-    famille: famille ? {
-      id: famille.id,
-      nom: famille.nom,
-      telephone: famille.telephone
-    } : {
-      id: 'test',
-      nom: nom_famille,
-      telephone: telephone
+  let result;
+  if (overridePhone) {
+    // Mode test avec numéro personnalisé
+    result = await smsService.sendSMS(telephone, message);
+    res.json({
+      success: true,
+      sent: 1,
+      results: [result],
+      famille: {
+        id: 'test',
+        nom: nom_famille,
+        telephones: [telephone]
+      }
+    });
+  } else {
+    // Mode normal : envoyer à tous les téléphones de la famille
+    const smsResults = await sendSMSToAllFamillePhones(smsService, famille, message);
+    
+    res.json({
+      success: true,
+      sent: smsResults.sent,
+      errors: smsResults.errors,
+      results: smsResults.results,
+      famille: {
+        id: famille.id,
+        nom: famille.nom,
+        telephones: [famille.telephone, famille.telephone2].filter(Boolean)
+      }
+    });
+  }
+}
+
+/**
+ * Fonction utilitaire générique pour envoyer SMS à une liste de familles
+ */
+async function sendSMSToFamillesList(smsService, planning, familles, messageGenerator, extraData = {}) {
+  const results = [];
+  let sent = 0;
+  let errors = 0;
+
+  for (const famille of familles) {
+    try {
+      if (!famille.telephone && !famille.telephone2) {
+        results.push({
+          famille_id: famille.id,
+          famille_nom: famille.nom,
+          success: false,
+          error: 'Aucun numéro de téléphone disponible',
+          ...extraData
+        });
+        errors++;
+        continue;
+      }
+
+      const message = messageGenerator(famille, planning);
+      const smsResults = await sendSMSToAllFamillePhones(smsService, famille, message);
+      
+      // Ajouter un résultat pour chaque téléphone envoyé
+      for (const smsResult of smsResults.results) {
+        results.push({
+          famille_id: famille.id,
+          famille_nom: famille.nom,
+          telephone: smsResult.telephone,
+          success: smsResult.success,
+          messageId: smsResult.messageId,
+          cost: smsResult.cost,
+          error: smsResult.error,
+          ...extraData
+        });
+      }
+      
+      sent += smsResults.sent;
+      errors += smsResults.errors;
+
+    } catch (error) {
+      results.push({
+        famille_id: famille.id,
+        famille_nom: famille.nom,
+        success: false,
+        error: error.message,
+        ...extraData
+      });
+      errors++;
     }
-  });
+  }
+
+  return { results, sent, errors, total: familles.length };
 }
 
 /**
@@ -669,63 +811,28 @@ async function sendToAffectations(res, smsService, planning, data) {
     return res.status(404).json({ error: 'Aucune affectation trouvée pour cette semaine' });
   }
 
-  const results = [];
-  let sent = 0;
-  let errors = 0;
+  const messageGenerator = (famille, planning) => {
+    const templateData = {
+      nom_famille: famille.nom,
+      classe_nom: famille.classe_nom,
+      date_debut: new Date(famille.debut).toLocaleDateString('fr-FR'),
+      date_fin: new Date(famille.fin).toLocaleDateString('fr-FR'),
+      planning_name: planning.name,
+      ...template_data
+    };
+    return smsService.generateMessage(template_key, templateData);
+  };
 
-  for (const famille of familles) {
-    try {
-      if (!famille.telephone) {
-        results.push({
-          famille_id: famille.id,
-          famille_nom: famille.nom,
-          success: false,
-          error: 'Numéro de téléphone manquant'
-        });
-        errors++;
-        continue;
-      }
-
-      const templateData = {
-        nom_famille: famille.nom,
-        classe_nom: famille.classe_nom,
-        date_debut: new Date(famille.debut).toLocaleDateString('fr-FR'),
-        date_fin: new Date(famille.fin).toLocaleDateString('fr-FR'),
-        planning_name: planning.name,
-        ...template_data
-      };
-
-      const message = smsService.generateMessage(template_key, templateData);
-      const smsResult = await smsService.sendSMS(famille.telephone, message);
-      
-      results.push({
-        famille_id: famille.id,
-        famille_nom: famille.nom,
-        telephone: famille.telephone,
-        classe_nom: famille.classe_nom,
-        success: true,
-        messageId: smsResult.messageId,
-        cost: smsResult.cost
-      });
-      sent++;
-
-    } catch (error) {
-      results.push({
-        famille_id: famille.id,
-        famille_nom: famille.nom,
-        success: false,
-        error: error.message
-      });
-      errors++;
-    }
-  }
+  const result = await sendSMSToFamillesList(
+    smsService, 
+    planning, 
+    familles, 
+    messageGenerator
+  );
 
   res.json({
     success: true,
-    sent,
-    errors,
-    total: familles.length,
-    results
+    ...result
   });
 }
 
@@ -738,11 +845,7 @@ async function sendBulk(res, smsService, planning, data) {
   let familles;
   if (famille_ids && famille_ids.length > 0) {
     // Envoi à des familles spécifiques
-    const placeholders = famille_ids.map((_, i) => `$${i + 2}`).join(',');
-    const result = await query(
-      `SELECT * FROM familles WHERE planning_id = $1 AND id IN (${placeholders}) AND is_active = true`,
-      [planning.id, ...famille_ids]
-    );
+    const result = await famillesQueries.getByIds(famille_ids, planning.id);
     familles = result.rows;
   } else {
     // Envoi à toutes les familles actives
@@ -753,64 +856,24 @@ async function sendBulk(res, smsService, planning, data) {
     return res.status(404).json({ error: 'Aucune famille trouvée' });
   }
 
-  const results = [];
-  let sent = 0;
-  let errors = 0;
-
-  for (const famille of familles) {
-    try {
-      if (!famille.telephone) {
-        results.push({
-          famille_id: famille.id,
-          famille_nom: famille.nom,
-          success: false,
-          error: 'Numéro de téléphone manquant'
-        });
-        errors++;
-        continue;
-      }
-
-      let message;
-      if (message_personnalise) {
-        message = message_personnalise.replace('{nom_famille}', famille.nom).replace('{planning_name}', planning.name);
-      } else {
-        const templateData = {
-          nom_famille: famille.nom,
-          planning_name: planning.name,
-          ...template_data
-        };
-        message = smsService.generateMessage(template_key, templateData);
-      }
-
-      const smsResult = await smsService.sendSMS(famille.telephone, message);
-      
-      results.push({
-        famille_id: famille.id,
-        famille_nom: famille.nom,
-        telephone: famille.telephone,
-        success: true,
-        messageId: smsResult.messageId,
-        cost: smsResult.cost
-      });
-      sent++;
-
-    } catch (error) {
-      results.push({
-        famille_id: famille.id,
-        famille_nom: famille.nom,
-        success: false,
-        error: error.message
-      });
-      errors++;
+  const messageGenerator = (famille, planning) => {
+    if (message_personnalise) {
+      return message_personnalise.replace('{nom_famille}', famille.nom).replace('{planning_name}', planning.name);
+    } else {
+      const templateData = {
+        nom_famille: famille.nom,
+        planning_name: planning.name,
+        ...template_data
+      };
+      return smsService.generateMessage(template_key, templateData);
     }
-  }
+  };
+
+  const result = await sendSMSToFamillesList(smsService, planning, familles, messageGenerator);
 
   res.json({
     success: true,
-    sent,
-    errors,
-    total: familles.length,
-    results
+    ...result
   });
 }
 
@@ -954,11 +1017,8 @@ async function deleteScheduledSMSHandler(res, data) {
 export default async function handler(req, res) {
   console.log('📱 SMS endpoint appelé');
   
-  // Headers CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Session');
-
+  corsMiddlewareSMS(req, res);
+  
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -967,6 +1027,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
-  return handlePost(req, res);
+  try {
+    return await handlePost(req, res);
+  } catch (error) {
+    handleApiError(error, res, 'SMS API');
+  }
 }
 

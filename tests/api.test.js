@@ -104,7 +104,8 @@ async function runTests() {
           name: 'Planning Test',
           description: 'Planning pour les tests automatisés',
           year: 2024,
-          adminPassword: 'admin123'
+          adminPassword: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123',
+          customToken: `api-test-${Date.now()}`
         }
       }
     });
@@ -112,15 +113,33 @@ async function runTests() {
     assertEqual(status, 201, 'Status devrait être 201');
     assert(data.success, 'Création devrait réussir');
     assert(data.planning.token, 'Token devrait être généré');
-    assert(data.sessionToken, 'Session admin devrait être créée');
 
     testPlanningToken = data.planning.token;
-    testAdminSession = data.sessionToken;
-    
     console.log(`   Token planning: ${testPlanningToken.substring(0, 8)}...`);
   });
 
-  // Test 2: Vérification de la session admin
+  // Test 2: Connexion en mode admin avec le planning
+  await runner.test('Connexion admin avec planning', async () => {
+    const { data, status } = await apiCall('/api/auth', {
+      method: 'POST',
+      body: {
+        action: 'login',
+        data: {
+          token: testPlanningToken,
+          password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'
+        }
+      }
+    });
+
+    assertEqual(status, 200, 'Status devrait être 200');
+    assert(data.success, 'Connexion devrait réussir');
+    assert(data.sessionToken, 'Session admin devrait être créée');
+
+    testAdminSession = data.sessionToken;
+    console.log(`   Session admin créée: ${testAdminSession.substring(0, 8)}...`);
+  });
+
+  // Test 3: Vérification de la session admin
   await runner.test('Vérification session admin', async () => {
     const { data, status } = await apiCall(`/api/auth?action=check_session&session_token=${testAdminSession}`);
 
@@ -129,7 +148,7 @@ async function runTests() {
     assertEqual(data.planning.token, testPlanningToken, 'Token planning devrait correspondre');
   });
 
-  // Test 3: Accès planning sans authentification (mode public)
+  // Test 4: Accès planning sans authentification (mode public)
   await runner.test('Accès planning mode public', async () => {
     const { data, status } = await apiCall(`/api/planning?token=${testPlanningToken}&type=full`);
 
@@ -139,7 +158,7 @@ async function runTests() {
     assertEqual(data.familles.length, 0, 'Familles ne devraient pas être visibles en mode public');
   });
 
-  // Test 4: Création d'une classe
+  // Test 5: Création d'une classe
   await runner.test('Création d\'une classe', async () => {
     const { data, status } = await apiCall('/api/planning', {
       method: 'POST',
@@ -164,7 +183,7 @@ async function runTests() {
     assertEqual(data.nom, 'Classe Test A', 'Nom devrait correspondre');
   });
 
-  // Test 5: Création d'une semaine
+  // Test 6: Création d'une semaine
   await runner.test('Création d\'une semaine', async () => {
     const { data, status } = await apiCall('/api/planning', {
       method: 'POST',
@@ -190,7 +209,7 @@ async function runTests() {
     assertEqual(data.is_published, false, 'Semaine ne devrait pas être publiée');
   });
 
-  // Test 6: Création d'une famille
+  // Test 7: Création d'une famille
   await runner.test('Création d\'une famille', async () => {
     const { data, status } = await apiCall('/api/familles', {
       method: 'POST',
@@ -220,7 +239,7 @@ async function runTests() {
     console.log(`   ID famille: ${testFamilleId}`);
   });
 
-  // Test 7: Création d'une affectation
+  // Test 8: Création d'une affectation
   await runner.test('Création d\'une affectation', async () => {
     const { data, status } = await apiCall('/api/planning', {
       method: 'POST',

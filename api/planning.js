@@ -12,34 +12,35 @@ import {
   createNextWeek,
   getFamilleExclusions
 } from './db.js';
+import { classesQueries, famillesQueries, semainesQueries, affectationsQueries, enrichedQueries } from './queries.js';
+import { handleApiError, validateRequiredParams, handleNotFound } from './errorHandlers.js';
+import { applyCommonMiddleware } from './middleware.js';
 
 export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  const middleware = applyCommonMiddleware(req, res);
+  if (middleware.handled) return;
 
   // Initialiser la base de données au premier appel
   await initDatabase();
   
   const { method } = req;
 
-  switch (method) {
-    case 'GET':
-      return await handleGet(req, res);
-    case 'POST':
-      return await handlePost(req, res);
-    case 'PUT':
-      return await handlePut(req, res);
-    case 'DELETE':
-      return await handleDelete(req, res);
-    default:
-      res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
-      res.status(405).end(`Method ${method} Not Allowed`);
+  try {
+    switch (method) {
+      case 'GET':
+        return await handleGet(req, res);
+      case 'POST':
+        return await handlePost(req, res);
+      case 'PUT':
+        return await handlePut(req, res);
+      case 'DELETE':
+        return await handleDelete(req, res);
+      default:
+        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+        res.status(405).end(`Method ${method} Not Allowed`);
+    }
+  } catch (error) {
+    handleApiError(error, res, 'planning API');
   }
 }
 
@@ -103,25 +104,13 @@ async function handleGet(req, res) {
     
     if (type === 'full') {
       // Récupérer toutes les données du planning avec les nouvelles relations
-      const classesResult = await query(
-        'SELECT * FROM classes WHERE planning_id = $1 ORDER BY ordre, id',
-        [planning.id]
-      );
+      const classesResult = await classesQueries.getAll(planning.id);
       
       // Filtrer les semaines selon les permissions
-      let semainesQuery = 'SELECT * FROM semaines WHERE planning_id = $1';
-      if (!isAdmin) {
-        semainesQuery += ' AND is_published = true';
-      }
-      semainesQuery += ' ORDER BY debut';
-      
-      const semainesResult = await query(semainesQuery, [planning.id]);
+      const semainesResult = await semainesQueries.getAll(planning.id, !isAdmin);
       
       // Charger les familles (toujours nécessaires pour l'affichage des affectations)
-      const famillesResult = await query(
-        'SELECT * FROM familles WHERE planning_id = $1 AND is_active = true ORDER BY nom',
-        [planning.id]
-      );
+      const famillesResult = await famillesQueries.getAll(planning.id, true);
       
       // Pour les admins, ajouter les exclusions aux familles
       if (isAdmin && famillesResult.rows.length > 0) {
@@ -136,29 +125,7 @@ async function handleGet(req, res) {
       let affectationsResult = { rows: [] };
       
       if (semainesIds.length > 0) {
-        const placeholders = semainesIds.map((_, i) => `$${i + 2}`).join(',');
-        affectationsResult = await query(`
-          SELECT a.*, 
-                 f.nom as famille_nom, 
-                 f.telephone as famille_telephone,
-                 f.nb_nettoyage,
-                 f.classes_preferences,
-                 c.nom as classe_nom, 
-                 c.couleur as classe_couleur,
-                 s.debut, s.fin, s.type as semaine_type, s.description as semaine_description,
-                 s.is_published, s.published_at,
-                 CASE 
-                   WHEN a.classe_id = ANY(f.classes_preferences) THEN 'Classe préférée'
-                   ELSE 'Assignation normale'
-                 END as preference_description,
-                 ROW_NUMBER() OVER (PARTITION BY a.famille_id ORDER BY s.debut, c.ordre, c.id) as nettoyage_numero
-          FROM affectations a
-          LEFT JOIN familles f ON a.famille_id = f.id
-          LEFT JOIN classes c ON a.classe_id = c.id AND a.planning_id = c.planning_id
-          LEFT JOIN semaines s ON a.semaine_id = s.id AND a.planning_id = s.planning_id
-          WHERE a.planning_id = $1 AND a.semaine_id IN (${placeholders})
-          ORDER BY s.debut, c.ordre, c.id
-        `, [planning.id, ...semainesIds]);
+        affectationsResult = await affectationsQueries.getEnrichedBySemaines(planning.id, semainesIds);
       }
 
       const data = {
@@ -180,6 +147,7 @@ async function handleGet(req, res) {
           // Données enrichies pour l'affichage
           familleNom: row.famille_nom,
           familleTelephone: isAdmin ? row.famille_telephone : null, // Téléphone seulement pour admin
+          familleTelephone2: isAdmin ? row.famille_telephone2 : null, // Deuxième téléphone seulement pour admin
           classeNom: row.classe_nom,
           classeCouleur: row.classe_couleur,
           semaineDebut: row.debut,
@@ -203,7 +171,7 @@ async function handleGet(req, res) {
       let result;
       switch (type) {
         case 'classes':
-          result = await query('SELECT * FROM classes WHERE planning_id = $1 ORDER BY ordre, id', [planning.id]);
+          result = await classesQueries.getAll(planning.id);
           break;
         case 'classes_template':
           // Générer un template CSV pour l'import de classes
@@ -215,45 +183,17 @@ async function handleGet(req, res) {
           res.setHeader('Content-Disposition', 'attachment; filename="template_classes.csv"');
           return res.status(200).send(csvContent);
         case 'semaines':
-          let semainesQuery = 'SELECT * FROM semaines WHERE planning_id = $1';
-          if (!isAdmin) {
-            semainesQuery += ' AND is_published = true';
-          }
-          semainesQuery += ' ORDER BY debut';
-          result = await query(semainesQuery, [planning.id]);
+          result = await semainesQueries.getAll(planning.id, !isAdmin);
           break;
         case 'familles':
           if (!isAdmin) {
             return res.status(403).json({ error: 'Accès interdit : informations familles réservées aux administrateurs' });
           }
-          result = await query('SELECT * FROM familles WHERE planning_id = $1 AND is_active = true ORDER BY nom', [planning.id]);
+          result = await famillesQueries.getAll(planning.id, true);
           break;
         case 'affectations':
-          // Récupérer toutes les affectations avec données enrichies (même requête que le chargement initial)
-          const affectationsQuery = `
-            SELECT a.*, 
-                   f.nom as famille_nom, 
-                   f.telephone as famille_telephone,
-                   f.nb_nettoyage,
-                   f.classes_preferences,
-                   c.nom as classe_nom, 
-                   c.couleur as classe_couleur,
-                   s.debut, s.fin, s.type as semaine_type, s.description as semaine_description,
-                   s.is_published, s.published_at,
-                   CASE 
-                     WHEN a.classe_id = ANY(f.classes_preferences) THEN 'Classe préférée'
-                     ELSE 'Assignation normale'
-                   END as preference_description,
-                   ROW_NUMBER() OVER (PARTITION BY a.famille_id ORDER BY s.debut, c.ordre, c.id) as nettoyage_numero
-            FROM affectations a
-            LEFT JOIN familles f ON a.famille_id = f.id
-            LEFT JOIN classes c ON a.classe_id = c.id AND a.planning_id = c.planning_id
-            LEFT JOIN semaines s ON a.semaine_id = s.id AND a.planning_id = s.planning_id
-            WHERE a.planning_id = $1
-            ORDER BY s.debut, c.ordre, c.id
-          `;
-          
-          const affectationsResult = await query(affectationsQuery, [planning.id]);
+          // Récupérer toutes les affectations avec données enrichies
+          const affectationsResult = await affectationsQueries.getAllEnriched(planning.id);
           const affectations = affectationsResult.rows.map(row => ({
             id: row.id,
             familleId: row.famille_id,
@@ -263,6 +203,7 @@ async function handleGet(req, res) {
             // Données enrichies pour l'affichage
             familleNom: row.famille_nom,
             familleTelephone: isAdmin ? row.famille_telephone : null, // Téléphone seulement pour admin
+            familleTelephone2: isAdmin ? row.famille_telephone2 : null, // Deuxième téléphone seulement pour admin
             classeNom: row.classe_nom,
             classeCouleur: row.classe_couleur,
             semaineDebut: row.debut,
@@ -311,14 +252,7 @@ async function handleGet(req, res) {
       res.status(200).json(result.rows);
     }
   } catch (error) {
-    console.error('Erreur GET planning:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else if (error.message.includes('ADMIN_REQUIRED')) {
-      res.status(403).json({ error: 'Accès administrateur requis' });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'GET planning');
   }
 }
 
@@ -449,25 +383,7 @@ async function handlePost(req, res) {
         res.status(400).json({ error: 'Type non supporté' });
     }
   } catch (error) {
-    console.error('Erreur POST planning:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else if (error.message.includes('ADMIN_REQUIRED')) {
-      res.status(403).json({ error: 'Accès administrateur requis' });
-    } else if (error.message.includes('duplicate key')) {
-      // Analyser le type de contrainte duplicate key
-      if (error.message.includes('classes_pkey') || error.message.includes('classes') && error.message.includes('id')) {
-        res.status(400).json({ error: 'Une classe avec cet ID existe déjà dans ce planning' });
-      } else if (error.message.includes('familles_nom_planning_unique')) {
-        res.status(400).json({ error: 'Une famille avec ce nom existe déjà dans ce planning' });
-      } else if (error.message.includes('affectations')) {
-        res.status(400).json({ error: 'Cette cellule est déjà occupée par une autre famille' });
-      } else {
-        res.status(400).json({ error: 'Cet élément existe déjà' });
-      }
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'POST planning');
   }
 }
 
@@ -530,14 +446,7 @@ async function handlePut(req, res) {
         res.status(400).json({ error: 'Type non supporté pour la mise à jour' });
     }
   } catch (error) {
-    console.error('Erreur PUT planning:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else if (error.message.includes('ADMIN_REQUIRED')) {
-      res.status(403).json({ error: 'Accès administrateur requis' });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'PUT planning');
   }
 }
 
@@ -616,14 +525,7 @@ async function handleDelete(req, res) {
         res.status(400).json({ error: 'Type non supporté pour la suppression' });
     }
   } catch (error) {
-    console.error('Erreur DELETE planning:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else if (error.message.includes('ADMIN_REQUIRED')) {
-      res.status(403).json({ error: 'Accès administrateur requis' });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'DELETE planning');
   }
 }
 

@@ -208,6 +208,11 @@ async function testImportValidation() {
   try {
     log('🔍 Test: Validation des données d\'import...', 'cyan');
     
+    // Récupérer l'ID d'une classe existante pour tester le doublon
+    const classesResponse = await fetch(`${API_BASE_URL}/api/planning?token=${testToken}&type=classes`);
+    const classesData = await classesResponse.json();
+    const existingClassId = classesData?.[0]?.id || 'TEST_A_UNKNOWN';
+    
     // Données de test avec erreurs intentionnelles
     const invalidClasses = [
       {
@@ -239,7 +244,7 @@ async function testImportValidation() {
         description: 'Test'
       },
       {
-        id: 'TEST_A', // ID déjà existant (erreur)
+        id: existingClassId, // ID déjà existant (erreur) 
         nom: 'Test Doublon',
         couleur: '#ffff00',
         ordre: '5',

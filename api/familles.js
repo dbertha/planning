@@ -7,31 +7,33 @@ import {
   getFamilleExclusions,
   validateAdminSession
 } from './db.js';
+import { classesQueries, famillesQueries } from './queries.js';
+import { handleApiError, validateRequiredParams, handleNotFound } from './errorHandlers.js';
+import { applyCommonMiddleware } from './middleware.js';
+import { validateFamilleData, validatePhoneNumber } from './validators.js';
 
 export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  const middleware = applyCommonMiddleware(req, res);
+  if (middleware.handled) return;
 
   const { method } = req;
 
-  switch (method) {
-    case 'GET':
-      return await handleGet(req, res);
-    case 'POST':
-      return await handlePost(req, res);
-    case 'PUT':
-      return await handlePut(req, res);
-    case 'DELETE':
-      return await handleDelete(req, res);
-    default:
-      res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
-      res.status(405).end(`Method ${method} Not Allowed`);
+  try {
+    switch (method) {
+      case 'GET':
+        return await handleGet(req, res);
+      case 'POST':
+        return await handlePost(req, res);
+      case 'PUT':
+        return await handlePut(req, res);
+      case 'DELETE':
+        return await handleDelete(req, res);
+      default:
+        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+        res.status(405).end(`Method ${method} Not Allowed`);
+    }
+  } catch (error) {
+    handleApiError(error, res, 'familles API');
   }
 }
 
@@ -92,17 +94,15 @@ async function handleGet(req, res) {
 
       case 'template':
         // Générer un template CSV pour l'import
-        const classes = await query(
-          'SELECT id, nom FROM classes WHERE planning_id = $1 ORDER BY ordre, id',
-          [planning.id]
-        );
+        const classes = await classesQueries.getAll(planning.id);
 
         const template = {
-          headers: ['nom', 'email', 'telephone', 'nb_nettoyage', 'classes_preferences', 'notes'],
+          headers: ['nom', 'email', 'telephone', 'telephone2', 'nb_nettoyage', 'classes_preferences', 'notes'],
           example: [
             'Famille Dupont',
             'dupont@email.com',
             '0123456789', // OBLIGATOIRE
+            '0123456790', // OPTIONNEL - Deuxième numéro
             '3',
             'A,C', // IDs des classes préférées
             'Remarques particulières'
@@ -112,6 +112,7 @@ async function handleGet(req, res) {
             nom: 'Nom de la famille (obligatoire)',
             email: 'Adresse email (optionnel)',
             telephone: 'Numéro de téléphone (OBLIGATOIRE pour SMS)',
+            telephone2: 'Deuxième numéro de téléphone (optionnel)',
             nb_nettoyage: 'Nombre de nettoyages par an (défaut: 3)',
             classes_preferences: 'IDs des classes préférées, séparés par virgule (ex: A,C)',
             notes: 'Remarques particulières (optionnel)'
@@ -173,12 +174,7 @@ async function handleGet(req, res) {
         return res.status(400).json({ error: 'Action non valide' });
     }
   } catch (error) {
-    console.error('Erreur GET familles:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'GET familles');
   }
 }
 
@@ -196,35 +192,19 @@ async function handlePost(req, res) {
 
     switch (action) {
       case 'create':
-        // Validation du téléphone obligatoire
-        if (!data.telephone || data.telephone.trim() === '') {
-          return res.status(400).json({ error: 'Numéro de téléphone obligatoire pour les SMS' });
-        }
-
-        // Valider que les classes préférées existent dans ce planning
-        const classesPreferences = data.classes_preferences || [];
-        if (classesPreferences.length > 0) {
-          for (const classeId of classesPreferences) {
-            const existingClasse = await query(
-              'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
-              [classeId, planning.id]
-            );
-            
-            if (existingClasse.rows.length === 0) {
-              return res.status(400).json({ error: `Classe '${classeId}' n'existe pas dans ce planning` });
-            }
-          }
-        }
+        // Validation des données famille
+        await validateFamilleData(data, planning.id);
 
         const createResult = await query(
-          'INSERT INTO familles (planning_id, nom, email, telephone, nb_nettoyage, classes_preferences, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+          'INSERT INTO familles (planning_id, nom, email, telephone, telephone2, nb_nettoyage, classes_preferences, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
           [
             planning.id, 
             data.nom, 
             data.email, 
             data.telephone.trim(), 
+            data.telephone2?.trim() || null,
             data.nb_nettoyage || 3, 
-            classesPreferences, 
+            data.classes_preferences || [], 
             data.notes
           ]
         );
@@ -268,10 +248,7 @@ async function handlePost(req, res) {
 
       case 'validate_preference':
         // Vérifier si une famille a une préférence pour une classe
-        const familleInfo = await query(
-          'SELECT classes_preferences FROM familles WHERE id = $1 AND planning_id = $2',
-          [data.famille_id, planning.id]
-        );
+        const familleInfo = await famillesQueries.getPreferences(data.famille_id, planning.id);
         
         if (familleInfo.rows.length === 0) {
           return res.status(404).json({ error: 'Famille non trouvée' });
@@ -290,14 +267,7 @@ async function handlePost(req, res) {
         res.status(400).json({ error: 'Action non supportée' });
     }
   } catch (error) {
-    console.error('Erreur POST familles:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else if (error.message.includes('duplicate key') && error.message.includes('familles_nom_planning_unique')) {
-      res.status(400).json({ error: 'Une famille avec ce nom existe déjà dans ce planning' });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'POST familles');
   }
 }
 
@@ -326,34 +296,18 @@ async function handlePut(req, res) {
 
       res.status(200).json(result.rows[0]);
     } else {
-      // Mise à jour d'une famille - validation du téléphone
-      if (data.telephone && data.telephone.trim() === '') {
-        return res.status(400).json({ error: 'Numéro de téléphone obligatoire pour les SMS' });
-      }
-
-      // Valider que les classes préférées existent dans ce planning
-      const classesPreferences = data.classes_preferences || [];
-      if (classesPreferences.length > 0) {
-        for (const classeId of classesPreferences) {
-          const existingClasse = await query(
-            'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
-            [classeId, planning.id]
-          );
-          
-          if (existingClasse.rows.length === 0) {
-            return res.status(400).json({ error: `Classe '${classeId}' n'existe pas dans ce planning` });
-          }
-        }
-      }
+      // Mise à jour d'une famille - validation des données
+      await validateFamilleData(data, planning.id, true);
 
       const result = await query(
-        'UPDATE familles SET nom = $1, email = $2, telephone = $3, nb_nettoyage = $4, classes_preferences = $5, notes = $6, updated_at = CURRENT_TIMESTAMP WHERE id = $7 AND planning_id = $8 RETURNING *',
+        'UPDATE familles SET nom = $1, email = $2, telephone = $3, telephone2 = $4, nb_nettoyage = $5, classes_preferences = $6, notes = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $8 AND planning_id = $9 RETURNING *',
         [
           data.nom, 
           data.email, 
           data.telephone?.trim(), 
+          data.telephone2?.trim() || null,
           data.nb_nettoyage, 
-          classesPreferences, 
+          data.classes_preferences || [], 
           data.notes, 
           id, 
           planning.id
@@ -367,14 +321,7 @@ async function handlePut(req, res) {
       res.status(200).json(result.rows[0]);
     }
   } catch (error) {
-    console.error('Erreur PUT familles:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else if (error.message.includes('duplicate key') && error.message.includes('familles_nom_planning_unique')) {
-      res.status(400).json({ error: 'Une famille avec ce nom existe déjà dans ce planning' });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'PUT familles');
   }
 }
 
@@ -427,12 +374,7 @@ async function handleDelete(req, res) {
       res.status(200).json({ message: 'Famille supprimée' });
     }
   } catch (error) {
-    console.error('Erreur DELETE familles:', error);
-    if (error.message.includes('Token')) {
-      res.status(401).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: 'Erreur serveur' });
-    }
+    handleApiError(error, res, 'DELETE familles');
   }
 }
 
@@ -445,54 +387,25 @@ async function handleImport(planningId, familles, filename) {
   for (let i = 0; i < familles.length; i++) {
     const famille = familles[i];
     try {
-      // Valider les données
-      if (!famille.nom || famille.nom.trim() === '') {
-        throw new Error('Nom de famille obligatoire');
-      }
-
-      // VALIDATION TÉLÉPHONE OBLIGATOIRE
-      if (!famille.telephone || famille.telephone.trim() === '') {
-        throw new Error('Numéro de téléphone obligatoire pour les SMS');
-      }
-
       // Convertir les préférences de classes de string vers array
-      let classesPreferences = [];
       if (famille.classes_preferences && typeof famille.classes_preferences === 'string') {
-        classesPreferences = famille.classes_preferences.split(',').map(id => id.trim()).filter(id => id);
-      } else if (Array.isArray(famille.classes_preferences)) {
-        classesPreferences = famille.classes_preferences;
+        famille.classes_preferences = famille.classes_preferences.split(',').map(id => id.trim()).filter(id => id);
       }
 
-      // Valider que les classes préférées existent dans ce planning
-      if (classesPreferences.length > 0) {
-        for (const classeId of classesPreferences) {
-          const existingClasse = await query(
-            'SELECT id FROM classes WHERE id = $1 AND planning_id = $2',
-            [classeId, planningId]
-          );
-          
-          if (existingClasse.rows.length === 0) {
-            throw new Error(`Classe '${classeId}' n'existe pas dans ce planning`);
-          }
-        }
-      }
-
-      // Valider le nombre de nettoyages
-      const nbNettoyage = parseInt(famille.nb_nettoyage) || 3;
-      if (nbNettoyage < 1 || nbNettoyage > 10) {
-        throw new Error('Nombre de nettoyages doit être entre 1 et 10');
-      }
+      // Validation complète des données famille
+      await validateFamilleData(famille, planningId);
 
       // Insérer la famille
       await query(
-        'INSERT INTO familles (planning_id, nom, email, telephone, nb_nettoyage, classes_preferences, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        'INSERT INTO familles (planning_id, nom, email, telephone, telephone2, nb_nettoyage, classes_preferences, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
         [
           planningId, 
           famille.nom.trim(), 
           famille.email || null, 
           famille.telephone.trim(), // OBLIGATOIRE
-          nbNettoyage, 
-          classesPreferences, 
+          famille.telephone2?.trim() || null, // OPTIONNEL
+          famille.nb_nettoyage, 
+          famille.classes_preferences || [], 
           famille.notes || null
         ]
       );

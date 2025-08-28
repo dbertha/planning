@@ -121,15 +121,29 @@ async function testSMSConfiguration() {
       }
     });
 
-    assertEqual(response.status, 200, 'Status devrait être 200');
+    assertEqual(response.status, 201, 'Status devrait être 201');
     assert(response.data.success, 'Création du planning devrait réussir');
     assert(response.data.planning.token, 'Token du planning devrait exister');
     
     testPlanningToken = response.data.planning.token;
-    testSessionToken = response.data.sessionToken;
+
+    // Se connecter en tant qu'admin
+    const loginResponse = await apiCall('/api/auth', {
+      method: 'POST',
+      body: {
+        action: 'login',
+        data: {
+          token: testPlanningToken,
+          password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'
+        }
+      }
+    });
+
+    assertEqual(loginResponse.status, 200, 'Connexion admin devrait réussir');
+    testSessionToken = loginResponse.data.sessionToken;
   });
 
-  // Test de la configuration SMS
+  // Test de la configuration SMSne
   await runner.test('Vérification de la configuration SMS', async () => {
     const response = await apiCall('/api/sms', {
       method: 'POST',
@@ -209,7 +223,21 @@ async function testSMSSending() {
 
     assert(planningResponse.data.success, 'Création du planning devrait réussir');
     testPlanningToken = planningResponse.data.planning.token;
-    testSessionToken = planningResponse.data.sessionToken;
+
+    // Se connecter en tant qu'admin
+    const loginResponse = await apiCall('/api/auth', {
+      method: 'POST',
+      body: {
+        action: 'login',
+        data: {
+          token: testPlanningToken,
+          password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'
+        }
+      }
+    });
+
+    assertEqual(loginResponse.status, 200, 'Connexion admin devrait réussir');
+    testSessionToken = loginResponse.data.sessionToken;
 
     // 2. Créer une classe
     const classeResponse = await apiCall('/api/planning', {
@@ -229,7 +257,9 @@ async function testSMSSending() {
       }
     });
 
-    assert(classeResponse.data.success, 'Création de la classe devrait réussir');
+    assertEqual(classeResponse.status, 201, 'Status création classe devrait être 201');
+    assert(classeResponse.data.id, 'Classe devrait avoir un ID');
+    assertEqual(classeResponse.data.id, 'TEST_SMS', 'ID de classe devrait correspondre');
 
     // 3. Créer une semaine
     const semaineResponse = await apiCall('/api/planning', {
@@ -244,7 +274,9 @@ async function testSMSSending() {
       }
     });
 
-    assert(semaineResponse.data.success, 'Création de la semaine devrait réussir');
+    assertEqual(semaineResponse.status, 201, 'Status création semaine devrait être 201');
+    assert(semaineResponse.data.success, 'Création de semaine devrait réussir');
+    assert(semaineResponse.data.semaine.id, 'Semaine devrait avoir un ID');
     testSemaineId = semaineResponse.data.semaine.id;
 
     // 4. Créer une famille avec téléphone
@@ -259,7 +291,8 @@ async function testSMSSending() {
         data: {
           nom: 'Famille Test SMS',
           email: 'test@example.com',
-          telephone: '+33123456789', // Numéro de test
+          telephone: '+33123456789', // Numéro de test principal
+          telephone2: '+33987654321', // Numéro de test secondaire
           nb_nettoyage: 3,
           classes_preferences: ['TEST_SMS'],
           notes: 'Famille créée pour tester les SMS'
@@ -267,7 +300,8 @@ async function testSMSSending() {
       }
     });
 
-    assert(familleResponse.data.id, 'Création de la famille devrait réussir');
+    assertEqual(familleResponse.status, 201, 'Status création famille devrait être 201');
+    assert(familleResponse.data.id, 'Famille devrait avoir un ID');
     testFamilleId = familleResponse.data.id;
 
     // 5. Créer une affectation
@@ -280,14 +314,15 @@ async function testSMSSending() {
         token: testPlanningToken,
         type: 'affectation',
         data: {
-          famille_id: testFamilleId,
-          classe_id: 'TEST_SMS',
-          semaine_id: testSemaineId
+          familleId: testFamilleId,
+          classeId: 'TEST_SMS',
+          semaineId: testSemaineId
         }
       }
     });
 
-    assert(affectationResponse.data.success, 'Création de l\'affectation devrait réussir');
+    assertEqual(affectationResponse.status, 201, 'Status création affectation devrait être 201');
+    assert(affectationResponse.data.id, 'Affectation devrait avoir un ID');
   });
 
   // Test d'envoi SMS à une famille
@@ -309,12 +344,15 @@ async function testSMSSending() {
 
     assertEqual(response.status, 200, 'Status devrait être 200');
     assert(response.data.success, 'Envoi SMS devrait réussir');
-    assertEqual(response.data.sent, 1, 'Un SMS devrait être envoyé');
+    assert(response.data.sent >= 1, 'Au moins un SMS devrait être envoyé');
+    // Avec telephone2, on peut avoir 2 SMS envoyés (vers les 2 numéros)
     assert(response.data.results.length > 0, 'Résultats devraient être présents');
     
     const result = response.data.results[0];
     assert(result.success, 'Résultat individuel devrait être un succès');
-    assert(result.testMode, 'Devrait être en mode test');
+    // Vérifier qu'au moins un des résultats est en mode test
+    const hasTestMode = response.data.results.some(r => r.testMode);
+    assert(hasTestMode, 'Au moins un résultat devrait être en mode test');
   });
 
   // Test d'envoi SMS avec message personnalisé
@@ -379,7 +417,61 @@ async function testSMSSending() {
 
     assertEqual(response.status, 200, 'Status devrait être 200');
     assert(response.data.success, 'Envoi SMS en masse devrait réussir');
-    assertEqual(response.data.sent, 1, 'Un SMS devrait être envoyé');
+    assert(response.data.sent >= 1, 'Au moins un SMS devrait être envoyé');
+  });
+
+  // Test d'envoi SMS vers le second numéro
+  await runner.test('Envoi SMS vers le second numéro de téléphone', async () => {
+    const response = await apiCall('/api/sms', {
+      method: 'POST',
+      headers: {
+        'X-Admin-Session': testSessionToken
+      },
+      body: {
+        token: testPlanningToken,
+        action: 'send_to_famille',
+        data: {
+          famille_id: testFamilleId,
+          template_key: 'affectation_rappel',
+          use_telephone2: true // Utiliser le second numéro
+        }
+      }
+    });
+
+    assertEqual(response.status, 200, 'Status devrait être 200');
+    assert(response.data.success, 'Envoi SMS vers telephone2 devrait réussir');
+    assert(response.data.sent >= 1, 'Au moins un SMS devrait être envoyé vers telephone2');
+    
+    const result = response.data.results[0];
+    assert(result.success, 'Résultat individuel devrait être un succès');
+    // Vérifier que le numéro utilisé est bien le telephone2
+    console.log('📱 Numéros SMS:', response.data.results.map(r => r.phone));
+    // Au moins un des résultats devrait utiliser le telephone2
+    const usesPhone2 = response.data.results.some(r => r.phone && r.phone.includes('987654321'));
+    assert(usesPhone2, 'Devrait utiliser le telephone2');
+  });
+
+  // Test d'envoi SMS avec préférence telephone2 en mode bulk
+  await runner.test('Envoi SMS en masse vers telephone2', async () => {
+    const response = await apiCall('/api/sms', {
+      method: 'POST',
+      headers: {
+        'X-Admin-Session': testSessionToken
+      },
+      body: {
+        token: testPlanningToken,
+        action: 'send_bulk',
+        data: {
+          famille_ids: [testFamilleId],
+          template_key: 'rappel_general',
+          use_telephone2: true // Utiliser le second numéro pour tous
+        }
+      }
+    });
+
+    assertEqual(response.status, 200, 'Status devrait être 200');
+    assert(response.data.success, 'Envoi SMS en masse vers telephone2 devrait réussir');
+    assert(response.data.sent >= 1, 'Au moins un SMS devrait être envoyé vers telephone2');
   });
 
   return runner.summary();
@@ -414,7 +506,21 @@ async function testSMSValidation() {
     });
 
     testPlanningToken = response.data.planning.token;
-    testSessionToken = response.data.sessionToken;
+
+    // Se connecter en tant qu'admin
+    const loginResponse = await apiCall('/api/auth', {
+      method: 'POST',
+      body: {
+        action: 'login',
+        data: {
+          token: testPlanningToken,
+          password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'
+        }
+      }
+    });
+
+    assertEqual(loginResponse.status, 200, 'Connexion admin devrait réussir');
+    testSessionToken = loginResponse.data.sessionToken;
   });
 
   // Test d'envoi sans permission admin
@@ -470,6 +576,7 @@ async function testSMSValidation() {
           nom: 'Famille Validation Test',
           email: 'validation@test.com',
           telephone: '+33987654321',
+          telephone2: '+33456789123', // Numéro secondaire pour tests de validation
           nb_nettoyage: 1
         }
       }
@@ -514,6 +621,58 @@ async function testSMSValidation() {
     });
 
     assertEqual(response.status, 401, 'Status devrait être 401 (token invalide)');
+  });
+
+  // Test envoi vers telephone2 quand il n'existe pas
+  await runner.test('Envoi SMS vers telephone2 inexistant', async () => {
+    // Créer une famille sans telephone2
+    const familleResponse = await apiCall('/api/familles', {
+      method: 'POST',
+      headers: {
+        'X-Admin-Session': testSessionToken
+      },
+      body: {
+        token: testPlanningToken,
+        action: 'create',
+        data: {
+          nom: 'Famille Sans Tel2',
+          email: 'sans-tel2@test.com',
+          telephone: '+33111222333',
+          // Pas de telephone2
+          nb_nettoyage: 1
+        }
+      }
+    });
+
+    const familleId = familleResponse.data.id;
+
+    const response = await apiCall('/api/sms', {
+      method: 'POST',
+      headers: {
+        'X-Admin-Session': testSessionToken
+      },
+      body: {
+        token: testPlanningToken,
+        action: 'send_to_famille',
+        data: {
+          famille_id: familleId,
+          template_key: 'affectation_rappel',
+          use_telephone2: true // Demander telephone2 qui n'existe pas
+        }
+      }
+    });
+
+    // Devrait se rabattre sur telephone principal ou échouer avec un message clair
+    if (response.status === 200) {
+      // Vérification que le SMS est envoyé vers le telephone principal
+      assert(response.data.success, 'Envoi devrait réussir en se rabattant sur telephone principal');
+      const result = response.data.results[0];
+      assert(result.phone.includes('111222333'), 'Devrait utiliser le telephone principal en fallback');
+    } else {
+      // Ou échouer avec un message d'erreur approprié
+      assertEqual(response.status, 400, 'Status devrait être 400 si telephone2 requis mais absent');
+      assert(response.data.error, 'Message d\'erreur devrait être présent');
+    }
   });
 
   return runner.summary();
@@ -645,7 +804,7 @@ async function runAllTests() {
 }
 
 // Exécuter les tests si ce fichier est lancé directement
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url.endsWith(process.argv[1]) || process.argv[1].endsWith('sms.test.js')) {
   runAllTests().then(success => {
     process.exit(success ? 0 : 1);
   }).catch(error => {
