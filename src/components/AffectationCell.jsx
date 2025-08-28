@@ -289,7 +289,7 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
 
         .famille-nom {
           font-weight: 600;
-          font-size: 11px;
+          font-size: 15px;
           text-align: center;
           color: #333;
           margin-bottom: 4px;
