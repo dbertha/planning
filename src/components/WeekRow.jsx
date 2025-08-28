@@ -9,6 +9,7 @@ export function WeekRow({ semaine, classes, familles, affectations, allAffectati
   const toast = useToast();
 
   // Calculer combien de classes sont libres pour CETTE semaine (utiliser toutes les affectations)
+  // Ajouter un identifiant unique pour forcer le re-calcul quand les données changent
   const realSemaineAffectations = allAffectations ? 
     allAffectations.filter(a => a.semaineId === semaine.id) :
     affectations.filter(a => a.semaineId === semaine.id);
@@ -16,6 +17,9 @@ export function WeekRow({ semaine, classes, familles, affectations, allAffectati
   const freeClasses = classes.filter(classe => !occupiedClasses.has(classe.id));
   const isComplete = freeClasses.length === 0 && classes.length > 0;
   const canAutoDistribute = canEdit && freeClasses.length > 0;
+
+  // Debug pour vérifier les données
+  console.log(`📊 WeekRow ${semaine.id}: ${realSemaineAffectations.length} affectations, ${freeClasses.length} classes libres`);
 
   const handleAutoDistribute = async () => {
     if (!canAutoDistribute || !onAutoDistribute) return;

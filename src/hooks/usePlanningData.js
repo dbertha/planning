@@ -402,15 +402,20 @@ export function usePlanningData(token) {
             }
             
             // Remplacement direct avec force de re-render React
+            // Utiliser un timestamp unique pour forcer la détection des changements
+            const updateTimestamp = Date.now();
             const newData = {
               ...prevData,
               affectations: newAffectations.map((aff, index) => ({
                 ...aff,
                 // Force React key change pour garantir re-render
-                _refreshKey: Date.now() + index
-              }))
+                _refreshKey: updateTimestamp + index
+              })),
+              // Ajouter un timestamp au niveau de data pour déclencher tous les re-renders
+              _lastAutoDistribute: updateTimestamp
             };
             
+            console.log('✅ Données mises à jour avec timestamp:', updateTimestamp);
             return newData;
           });
         } else {

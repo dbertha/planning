@@ -473,85 +473,236 @@ export const getFamilleExclusions = async (familleId, planningId) => {
   return result.rows;
 };
 
-// Distribution automatique pour une semaine
+// Distribution automatique pour une semaine - Version optimisée avec algorithme hongrois
 export const autoDistributeWeek = async (semaineId, planningId) => {
-  try {
-    // 1. Récupérer les informations de la semaine
-    const semaineResult = await query(
-      'SELECT debut, fin FROM semaines WHERE id = $1 AND planning_id = $2',
-      [semaineId, planningId]
-    );
+  // Import munkres-js pour l'algorithme hongrois
+  const munkresModule = await import('munkres-js');
+  const Munkres = munkresModule.default?.Munkres || munkresModule.Munkres;
+  
+  // Paramètres de l'algorithme
+  const ALPHA = 100;       // poids pour l'équité temporelle
+  const LARGE_COST = 1e7;  // coût prohibitif pour empêcher un appariement
 
-    if (semaineResult.rows.length === 0) {
+  try {
+    // 1. Récupération des données de base en parallèle
+    const [
+      semaineRes,
+      classesRes,
+      occupiedClassesRes,
+      occupiedFamiliesRes,
+      assignedCountsRes,
+      weeksRes,
+      classesCountRes
+    ] = await Promise.all([
+      query('SELECT id, debut, fin FROM semaines WHERE id = $1 AND planning_id = $2', [semaineId, planningId]),
+      query('SELECT id, nom, ordre FROM classes WHERE planning_id = $1 ORDER BY ordre, id', [planningId]),
+      // Classes déjà occupées cette semaine
+      query('SELECT classe_id FROM affectations WHERE semaine_id = $1 AND planning_id = $2', [semaineId, planningId]),
+      // Familles déjà assignées cette semaine
+      query('SELECT famille_id FROM affectations WHERE semaine_id = $1 AND planning_id = $2', [semaineId, planningId]),
+      // Compteur d'affectations AVANT cette semaine (pour l'équité)
+      query(`
+        SELECT a.famille_id, COUNT(*) AS c
+        FROM affectations a
+        JOIN semaines s ON a.semaine_id = s.id
+        WHERE a.planning_id = $1 AND s.debut < (SELECT debut FROM semaines WHERE id = $2)
+        GROUP BY a.famille_id
+      `, [planningId, semaineId]),
+      query('SELECT id, debut FROM semaines WHERE planning_id = $1 ORDER BY debut', [planningId]),
+      query('SELECT COUNT(*) AS c FROM classes WHERE planning_id = $1', [planningId])
+    ]);
+
+    if (semaineRes.rows.length === 0) {
       throw new Error('Semaine introuvable');
     }
+    const semaine = semaineRes.rows[0];
 
-    const { debut, fin } = semaineResult.rows[0];
+    // 2. Récupérer les familles avec vérification des exclusions pour cette période
+    const familiesRes = await query(`
+      SELECT f.id AS famille_id, f.nom, f.nb_nettoyage, f.classes_preferences,
+             CASE 
+               WHEN EXISTS (
+                 SELECT 1 FROM familles_exclusions fe 
+                 WHERE fe.famille_id = f.id 
+                 AND fe.planning_id = f.planning_id
+                 AND (
+                   (fe.date_debut <= $2 AND fe.date_fin >= $2) OR
+                   (fe.date_debut <= $3 AND fe.date_fin >= $3) OR
+                   (fe.date_debut >= $2 AND fe.date_fin <= $3)
+                 )
+               ) THEN true
+               ELSE false
+             END as is_excluded
+      FROM familles f
+      WHERE f.planning_id = $1 AND f.is_active = true
+    `, [planningId, semaine.debut, semaine.fin]);
 
-    // 2. Récupérer toutes les classes
-    const classesResult = await query(
-      'SELECT id, nom FROM classes WHERE planning_id = $1 ORDER BY ordre, id',
-      [planningId]
-    );
+    const classes = classesRes.rows;
+    const occupiedClasses = new Set(occupiedClassesRes.rows.map(r => r.classe_id));
+    const occupiedFamilies = new Set(occupiedFamiliesRes.rows.map(r => Number(r.famille_id)));
+    const assignedMap = new Map(assignedCountsRes.rows.map(r => [Number(r.famille_id), Number(r.c)]));
 
-    const classes = classesResult.rows;
-    if (classes.length === 0) {
-      throw new Error('Aucune classe trouvée pour ce planning');
-    }
+    const totalWeeks = weeksRes.rows.length;
+    const classesCount = Number(classesCountRes.rows[0]?.c || 0);
+    const totalSlotsInPlanning = Math.max(1, totalWeeks * classesCount);
+    const numFamilies = familiesRes.rows.length;
 
-    // 3. Récupérer les familles disponibles avec leurs statistiques
-    const famillesStats = await calculateFamiliesStats(planningId, debut);
+    // Calcul de l'index de la semaine (position dans l'année)
+    const weekIndex = weeksRes.rows.findIndex(w => w.id === semaineId);
+    const fractionSoFar = weekIndex / Math.max(1, totalWeeks);
+    const targetPerFamily = totalSlotsInPlanning / Math.max(1, numFamilies);
+    const idealToDate = targetPerFamily * fractionSoFar;
 
-    // 4. Trouver les classes déjà occupées pour cette semaine
-    const occupiedCellsResult = await query(
-      'SELECT classe_id FROM affectations WHERE semaine_id = $1 AND planning_id = $2',
-      [semaineId, planningId]
-    );
-    
-    const occupiedClasses = new Set(occupiedCellsResult.rows.map(row => row.classe_id));
+    // Construction de la liste des familles avec leurs préférences
+    const families = familiesRes.rows
+      .filter(r => !r.is_excluded) // Exclure les familles indisponibles
+      .map(r => ({
+        famille_id: Number(r.famille_id),
+        nom: r.nom,
+        nb_nettoyage: r.nb_nettoyage,
+        classes_pref: new Set((r.classes_preferences || []).map(id => id.toString())),
+        current_assignments: assignedMap.get(Number(r.famille_id)) || 0
+      }));
 
-    // 5. Filtrer les classes disponibles
-    const availableClasses = classes.filter(classe => !occupiedClasses.has(classe.id));
+    // 2. Classes disponibles pour cette semaine
+    const availableClasses = classes
+      .map(r => ({ id: r.id.toString(), nom: r.nom }))
+      .filter(c => !occupiedClasses.has(c.id));
 
     if (availableClasses.length === 0) {
       return {
         success: true,
         message: 'Toutes les classes sont déjà occupées pour cette semaine',
-        affectations_created: 0
+        affectations_created: 0,
+        details: [],
+        available_classes: 0,
+        total_classes: classes.length
       };
     }
 
-    // 6. Algorithme de distribution optimisée (évite les assignations sous-optimales)
-    const affectationsToCreate = await optimizeAssignments(
-      availableClasses, 
-      famillesStats, 
-      semaineId, 
-      planningId, 
-      debut, 
-      fin
-    );
-    // 7. Créer les affectations en base
-    let createdCount = 0;
-    const createdAffectations = [];
+    const S = availableClasses.length; // nombre de créneaux (classes) à assigner
 
-    for (const affectation of affectationsToCreate) {
-      try {
-        const result = await query(
-          'INSERT INTO affectations (planning_id, famille_id, classe_id, semaine_id, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-          [planningId, affectation.famille_id, affectation.classe_id, affectation.semaine_id, affectation.notes]
-        );
+    // 3. Filtrage des candidats par créneau (contraintes strictes)
+    const candidatesPerSlot = new Array(S);
+    const candidateSet = new Set();
+
+    for (let s = 0; s < S; s++) {
+      const clsId = availableClasses[s].id;
+      const arr = [];
+      
+      for (const f of families) {
+        // Contraintes strictes:
+        if (occupiedFamilies.has(f.famille_id)) continue;         // déjà assignée cette semaine
+        if (!f.classes_pref.has(clsId)) continue;                // doit avoir cette classe en préférence
+        if (f.current_assignments >= f.nb_nettoyage) continue;   // quota déjà atteint
         
-        createdAffectations.push(result.rows[0]);
-        createdCount++;
-      } catch (error) {
-        console.warn(`Erreur lors de la création d'une affectation:`, error.message);
-        // Continuer avec les autres affectations
+        arr.push(f.famille_id);
+        candidateSet.add(f.famille_id);
+      }
+      candidatesPerSlot[s] = arr;
+    }
+
+    // Détection des conflits (créneaux sans candidats)
+    const conflictSlots = [];
+    for (let s = 0; s < S; s++) {
+      if (!candidatesPerSlot[s] || candidatesPerSlot[s].length === 0) {
+        conflictSlots.push(availableClasses[s].id);
+      }
+    }
+    
+    if (conflictSlots.length > 0) {
+      console.warn(`⚠️ Créneaux sans candidats éligibles: ${conflictSlots.join(', ')}`);
+      return {
+        success: false,
+        message: `Aucune famille éligible pour les classes: ${conflictSlots.join(', ')}`,
+        conflict_slots: conflictSlots,
+        affectations_created: 0,
+        details: [],
+        available_classes: availableClasses.length,
+        total_classes: classes.length
+      };
+    }
+
+    // 4. Préparation de la matrice de coûts pour l'algorithme hongrois
+    const candidateFamilies = Array.from(candidateSet);
+    const familiesToInclude = families.filter(f => candidateSet.has(f.famille_id));
+    
+    const n = Math.max(candidateFamilies.length, S);
+    const famIndex = new Map(candidateFamilies.map((id, i) => [id, i]));
+    const matrix = Array.from({ length: n }, () => Array(n).fill(LARGE_COST));
+
+    // Remplissage de la matrice avec les coûts d'équité temporelle
+    for (let r = 0; r < candidateFamilies.length; r++) {
+      const famId = candidateFamilies[r];
+      const famille = familiesToInclude.find(f => f.famille_id === famId);
+      
+      if (!famille) continue;
+      
+      const assignedSoFar = famille.current_assignments;
+      const over = assignedSoFar - idealToDate;
+      const timeScore = Math.max(0, over);
+      const timeCost = Math.round(ALPHA * timeScore);
+
+      for (let c = 0; c < S; c++) {
+        const clsId = availableClasses[c].id;
+        if (!candidatesPerSlot[c].includes(famId)) continue;
+        matrix[r][c] = timeCost; // Coût basé sur l'équité temporelle
       }
     }
 
+    // 5. Exécution de l'algorithme hongrois
+    const munkres = new Munkres();
+    const indexes = munkres.compute(matrix);
+
+    // 6. Extraction des affectations valides
+    const assignments = [];
+    for (const [r, c] of indexes) {
+      if (r < candidateFamilies.length && c < S && matrix[r][c] < LARGE_COST / 2) {
+        const famille = familiesToInclude.find(f => f.famille_id === candidateFamilies[r]);
+        const assignedSoFar = famille ? famille.current_assignments : 0;
+        const progressPercentage = famille ? (assignedSoFar / famille.nb_nettoyage * 100) : 0;
+        
+        assignments.push({
+          famille_id: candidateFamilies[r],
+          classe_id: availableClasses[c].id,
+          semaine_id: semaineId,
+          notes: `Auto-assigné (préférence) - ${progressPercentage.toFixed(1)}% complété`
+        });
+      }
+    }
+
+    if (assignments.length < S) {
+      console.warn(`⚠️ Seulement ${assignments.length}/${S} affectations générées`);
+    }
+
+    // 7. Insertion en lot des affectations
+    const valuesSql = [];
+    const params = [];
+    assignments.forEach((a, i) => {
+      const base = i * 5;
+      valuesSql.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5})`);
+      params.push(planningId, a.famille_id, a.classe_id, a.semaine_id, a.notes);
+    });
+
+    let createdAffectations = [];
+    let createdCount = 0;
+
+    if (assignments.length > 0) {
+      const insertSql = `INSERT INTO affectations (planning_id, famille_id, classe_id, semaine_id, notes) VALUES ${valuesSql.join(', ')} RETURNING *`;
+      const inserted = await query(insertSql, params);
+      createdAffectations = inserted.rows || [];
+      createdCount = createdAffectations.length;
+    }
+
+    // 8. Statistiques pour le log
+    const preferencesRespected = assignments.length; // Toutes les affectations respectent les préférences par construction
+    const preferenceRate = assignments.length > 0 ? 100 : 0;
+    
+    console.log(`📊 Résultat optimisé: ${createdCount} affectations, ${preferencesRespected} préférences respectées (${preferenceRate}%)`);
+
     return {
       success: true,
-      message: `${createdCount} affectation(s) créée(s) automatiquement`,
+      message: `${createdCount} affectation(s) créée(s) automatiquement (toutes avec préférences)`,
       affectations_created: createdCount,
       details: createdAffectations,
       available_classes: availableClasses.length,
@@ -559,239 +710,12 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
     };
 
   } catch (error) {
-    console.error('Erreur lors de la distribution automatique:', error);
+    console.error('Erreur lors de la distribution automatique optimisée:', error);
     throw error;
   }
 };
 
-// Fonction utilitaire pour calculer les statistiques des familles
-const calculateFamiliesStats = async (planningId, currentDate) => {
-  const result = await query(`
-    SELECT 
-      f.id,
-      f.nom,
-      f.nb_nettoyage,
-      COUNT(a.id) as current_affectations,
-      CASE 
-        WHEN f.nb_nettoyage > 0 THEN (COUNT(a.id)::float / f.nb_nettoyage * 100)
-        ELSE 0
-      END as percentage_completed,
-      -- Calculer le pourcentage attendu basé sur la progression dans l'année
-      CASE 
-        WHEN total_weeks.total > 0 THEN (weeks_passed.passed::float / total_weeks.total * f.nb_nettoyage)
-        ELSE 0
-      END as expected_affectations_by_now
-    FROM familles f
-    LEFT JOIN affectations a ON a.famille_id = f.id AND a.planning_id = f.planning_id
-    LEFT JOIN semaines s ON a.semaine_id = s.id AND a.planning_id = s.planning_id
-    -- Calculer le total de semaines dans le planning
-    CROSS JOIN (
-      SELECT COUNT(*) as total 
-      FROM semaines 
-      WHERE planning_id = $1
-    ) total_weeks
-    -- Calculer les semaines passées jusqu'à maintenant
-    CROSS JOIN (
-      SELECT COUNT(*) as passed 
-      FROM semaines 
-      WHERE planning_id = $1 AND debut <= $2
-    ) weeks_passed
-    WHERE f.planning_id = $1 AND f.is_active = true
-    GROUP BY f.id, f.nom, f.nb_nettoyage, total_weeks.total, weeks_passed.passed
-    ORDER BY percentage_completed ASC, f.nom
-  `, [planningId, currentDate]);
 
-  return result.rows;
-};
-
-// Algorithme d'assignation équilibrée avec respect des préférences
-const optimizeAssignments = async (availableClasses, famillesStats, semaineId, planningId, debut, fin) => {
-  console.log(`🎯 Début de l'optimisation pour ${availableClasses.length} classes disponibles`);
-  
-  // 1. Récupérer toutes les familles disponibles (sans exclusions)
-  const allAvailableFamilies = [];
-  const familiesByClass = new Map();
-  
-  for (const classe of availableClasses) {
-    const availableFamilies = await getAvailableFamiliesForPeriod(
-      classe.id, 
-      semaineId, 
-      planningId, 
-      debut, 
-      fin
-    );
-    
-    familiesByClass.set(classe.id, availableFamilies);
-    
-    // Collecter toutes les familles uniques
-    for (const famille of availableFamilies) {
-      if (!allAvailableFamilies.find(f => f.id === famille.id)) {
-        const stats = famillesStats.find(s => s.id === famille.id) || {
-          current_affectations: 0,
-          percentage_completed: 0
-        };
-        allAvailableFamilies.push({ ...famille, ...stats });
-      }
-    }
-  }
-
-  console.log(`👨‍👩‍👧‍👦 ${allAvailableFamilies.length} familles disponibles au total`);
-
-  // 2. Sélection équilibrée des familles (priorité aux moins chargées)
-  const selectedFamilies = allAvailableFamilies
-    .sort((a, b) => {
-      // Tri principal : pourcentage de completion
-      if (a.percentage_completed !== b.percentage_completed) {
-        return a.percentage_completed - b.percentage_completed;
-      }
-      // Tri secondaire : randomisation pour éviter les patterns
-      return Math.random() - 0.5;
-    })
-    .slice(0, availableClasses.length); // Prendre autant de familles que de classes
-
-  console.log(`🎲 ${selectedFamilies.length} familles sélectionnées pour équilibrage`);
-
-  // 3. Algorithme d'assignation avec préférences
-  const assignments = [];
-  const usedFamilies = new Set();
-  const usedClasses = new Set();
-  
-  // Phase 1: Essayer d'assigner chaque famille à une classe de ses préférences
-  for (const famille of selectedFamilies) {
-    if (usedFamilies.has(famille.id)) continue;
-    
-    // Trouver les classes disponibles pour cette famille
-    let availableClassesForFamily = availableClasses.filter(classe => 
-      !usedClasses.has(classe.id) && 
-      familiesByClass.get(classe.id)?.find(f => f.id === famille.id)
-    );
-    
-    // Séparer les classes préférées des autres
-    const preferredClasses = availableClassesForFamily.filter(classe => 
-      famille.classes_preferences && famille.classes_preferences.includes(classe.id)
-    );
-    
-    const nonPreferredClasses = availableClassesForFamily.filter(classe => 
-      !famille.classes_preferences || !famille.classes_preferences.includes(classe.id)
-    );
-    
-    // Priorité aux préférences, sinon première classe disponible
-    const classeToAssign = preferredClasses.length > 0 
-      ? preferredClasses[0] 
-      : nonPreferredClasses[0];
-    
-    if (classeToAssign) {
-      const isPreferred = preferredClasses.includes(classeToAssign);
-      
-      assignments.push({
-        famille_id: famille.id,
-        classe_id: classeToAssign.id,
-        semaine_id: semaineId,
-        planning_id: planningId,
-        notes: `Auto-assigné ${isPreferred ? '(préférence)' : '(équilibrage)'} - ${famille.percentage_completed.toFixed(1)}% complété`
-      });
-      
-      usedFamilies.add(famille.id);
-      usedClasses.add(classeToAssign.id);
-      
-      console.log(`✅ ${famille.nom} → Classe ${classeToAssign.id} ${isPreferred ? '(PREF)' : '(EQUI)'}`);
-    }
-  }
-
-  // Phase 2: Remplir les classes restantes avec les familles restantes
-  const remainingClasses = availableClasses.filter(classe => !usedClasses.has(classe.id));
-  
-  if (remainingClasses.length > 0) {
-    console.log(`🔄 Phase 2: ${remainingClasses.length} classes restantes à assigner`);
-    
-    for (const classe of remainingClasses) {
-      const availableFamiliesForClass = familiesByClass.get(classe.id)?.filter(famille => 
-        !usedFamilies.has(famille.id)
-      ) || [];
-      
-      if (availableFamiliesForClass.length > 0) {
-        // Trier par charge croissante puis préférence
-        availableFamiliesForClass.sort((a, b) => {
-          const statsA = famillesStats.find(s => s.id === a.id) || { percentage_completed: 0 };
-          const statsB = famillesStats.find(s => s.id === b.id) || { percentage_completed: 0 };
-          
-          // Priorité 1: familles avec préférence pour cette classe
-          const prefA = a.classes_preferences?.includes(classe.id) ? 1 : 0;
-          const prefB = b.classes_preferences?.includes(classe.id) ? 1 : 0;
-          if (prefA !== prefB) return prefB - prefA;
-          
-          // Priorité 2: charge la plus faible
-          return statsA.percentage_completed - statsB.percentage_completed;
-        });
-        
-        const selectedFamille = availableFamiliesForClass[0];
-        const stats = famillesStats.find(s => s.id === selectedFamille.id) || { percentage_completed: 0 };
-        const isPreferred = selectedFamille.classes_preferences?.includes(classe.id);
-        
-        assignments.push({
-          famille_id: selectedFamille.id,
-          classe_id: classe.id,
-          semaine_id: semaineId,
-          planning_id: planningId,
-          notes: `Auto-assigné ${isPreferred ? '(préférence)' : '(complément)'} - ${stats.percentage_completed.toFixed(1)}% complété`
-        });
-        
-        usedFamilies.add(selectedFamille.id);
-        
-        console.log(`✅ ${selectedFamille.nom} → Classe ${classe.id} ${isPreferred ? '(PREF)' : '(COMP)'}`);
-      }
-    }
-  }
-
-  const preferencesRespected = assignments.filter(a => a.notes.includes('préférence')).length;
-  const totalAssignments = assignments.length;
-  const preferenceRate = totalAssignments > 0 ? (preferencesRespected / totalAssignments * 100).toFixed(1) : 0;
-  
-  console.log(`📊 Résultat: ${totalAssignments} assignations, ${preferencesRespected} préférences respectées (${preferenceRate}%)`);
-  
-  return assignments;
-};
-
-// Fonction utilitaire pour obtenir les familles disponibles pour une classe et période spécifique
-const getAvailableFamiliesForPeriod = async (classeId, semaineId, planningId, debut, fin) => {
-  const result = await query(`
-    SELECT f.id, f.nom, f.telephone, f.nb_nettoyage, f.classes_preferences,
-           CASE 
-             WHEN $1 = ANY(f.classes_preferences) THEN true
-             ELSE false
-           END as has_preference,
-           COUNT(a.id) as current_affectations
-    FROM familles f
-    LEFT JOIN affectations a ON a.famille_id = f.id AND a.planning_id = f.planning_id
-    WHERE f.planning_id = $2 AND f.is_active = true
-      -- Pas déjà affectée à une autre cellule cette semaine
-      AND NOT EXISTS (
-        SELECT 1 FROM affectations a2 
-        WHERE a2.famille_id = f.id 
-          AND a2.semaine_id = $3 
-          AND a2.planning_id = $2
-      )
-      -- Pas d'exclusion temporelle
-      AND NOT EXISTS (
-        SELECT 1 FROM familles_exclusions fe
-        WHERE fe.famille_id = f.id 
-          AND fe.planning_id = $2
-          AND (
-            (fe.date_debut <= $4 AND fe.date_fin >= $4) OR
-            (fe.date_debut <= $5 AND fe.date_fin >= $5) OR
-            (fe.date_debut >= $4 AND fe.date_fin <= $5)
-          )
-      )
-    GROUP BY f.id, f.nom, f.telephone, f.nb_nettoyage, f.classes_preferences
-    HAVING COUNT(a.id) < f.nb_nettoyage
-    ORDER BY 
-      CASE WHEN $1 = ANY(f.classes_preferences) THEN true ELSE false END DESC,
-      COUNT(a.id) ASC,
-      f.nom
-  `, [classeId, planningId, semaineId, debut, fin]);
-  
-  return result.rows;
-};
 
 // Créer automatiquement la semaine suivante
 export const createNextWeek = async (planningId) => {
