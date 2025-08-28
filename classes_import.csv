@@ -1,0 +1,8 @@
+id,nom,couleur,ordre,description
+A,"Partie A - Maternelle",#ffb3ba,1,"Local Canard (Classe de Stéphanie) + local Grenouille (Salle de Taï-Chi au grenier)"
+B,"Partie B - Maternelle",#ffdfba,2,"Local Chat (Classe d'Eglantine) + espace Cuisine du local Cheval (grenier)"
+C,"Partie C - Maternelle",#ffffba,3,"Local Poule (Classe de Candice) + local Poisson (local sieste des marmottes)"
+G,"Partie G - Maternelle",#baffba,4,"Local Libellule (Classe de Béatrice) + local Cheval (grenier) = uniquement espace devant le local Écureuil (salle des profs), plancher et scène compris"
+D,"Partie D - Primaire",#baffc9,5,"Local Hirondelle (Classe de P3) + local Milan (classe de P4)"
+E,"Partie E - Primaire",#bae1ff,6,"Local Papillon (Classe de P1) + local Vache (Classe de P5)"
+F,"Partie F - Primaire",#c9baff,7,"Local Chien (Classe de P6) + local Lapin (Classe de P2)"

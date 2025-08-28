@@ -42,6 +42,45 @@ export function Planning() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [tokenInput, setTokenInput] = useState(token);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [gridPosition, setGridPosition] = useState({ left: 0, width: 0 });
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  // Fonction pour mettre à jour l'état des flèches
+  const updateScrollArrows = () => {
+    const scrollContainer = document.querySelector('.planning-scroll-container');
+    if (!scrollContainer) return;
+    
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainer;
+    const canLeft = scrollLeft > 0;
+    const canRight = scrollLeft < scrollWidth - clientWidth - 1;
+    
+    // Calculer la position du conteneur pour les flèches fixes
+    const containerRect = scrollContainer.getBoundingClientRect();
+    setGridPosition({
+      left: containerRect.left,
+      width: containerRect.width
+    });
+    
+    setCanScrollLeft(canLeft);
+    setCanScrollRight(canRight);
+  };
+
+  // Fonctions de navigation
+  const scrollLeftArrow = () => {
+    const scrollContainer = document.querySelector('.planning-scroll-container');
+    if (scrollContainer) {
+      scrollContainer.scrollBy({ left: -200, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRightArrow = () => {
+    const scrollContainer = document.querySelector('.planning-scroll-container');
+    if (scrollContainer) {
+      scrollContainer.scrollBy({ left: 200, behavior: 'smooth' });
+    }
+  };
 
   // Fonction pour scroller vers la semaine courante
   const scrollToCurrentWeek = () => {
@@ -72,11 +111,62 @@ export function Planning() {
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth <= 768);
+      setWindowWidth(window.innerWidth);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Gestion des flèches de navigation (après que les données soient chargées)
+  useEffect(() => {
+    // Attendre que les classes soient vraiment chargées
+    if (!data.classes || data.classes.length === 0 || loading) return;
+
+    const handleScroll = () => {
+      updateScrollArrows();
+    };
+
+    const handleResize = () => {
+      updateScrollArrows();
+    };
+
+    // Configuration avec délai pour s'assurer que le DOM est prêt
+    const timer = setTimeout(() => {
+      const scrollContainer = document.querySelector('.planning-scroll-container');
+      if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('resize', handleResize);
+        
+        // Force une mise à jour immédiate pour positionner les flèches
+        updateScrollArrows();
+        
+        // Puis plusieurs mises à jour pour s'assurer que tout est correct
+        setTimeout(updateScrollArrows, 50);
+        setTimeout(updateScrollArrows, 200);
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      const scrollContainer = document.querySelector('.planning-scroll-container');
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [data.classes, loading]);
+
+
+
+  // Mettre à jour les flèches quand la sidebar change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      updateScrollArrows();
+    }, 350); // Attendre la fin de la transition CSS (0.3s + marge)
+
+    return () => clearTimeout(timer);
+  }, [sidebarCollapsed]);
 
   // Mettre à jour l'URL quand le token change
   useEffect(() => {
@@ -404,6 +494,18 @@ export function Planning() {
                 </div>
 
                 <div className="planning-scroll-container">
+                  {/* Flèches de navigation */}
+                  {!isMobile && canScrollLeft && (
+                    <button className="scroll-arrow scroll-arrow-left" onClick={scrollLeftArrow}>
+                      ←
+                    </button>
+                  )}
+                  {!isMobile && canScrollRight && (
+                    <button className="scroll-arrow scroll-arrow-right" onClick={scrollRightArrow}>
+                      →
+                    </button>
+                  )}
+                  
                   <div className="planning-grid-wrapper">
                     <PlanningHeader ref={originalHeaderRef} classes={data.classes} />
                     <PlanningGrid 
@@ -599,6 +701,7 @@ export function Planning() {
           min-width: 0; /* Important pour le flexbox */
           scrollbar-width: thin;
           scrollbar-color: #007bff #f1f1f1;
+          position: relative; /* Pour positionner les flèches */
         }
 
         .planning-scroll-container::-webkit-scrollbar {
@@ -620,8 +723,45 @@ export function Planning() {
         }
 
         .planning-grid-wrapper {
-          min-width: ${data.classes?.length ? data.classes.length * 150 + 320 : 940}px;
+          min-width: ${data.classes?.length ? data.classes.length * 150 + 120 : 720}px;
           width: 100%;
+        }
+
+        .scroll-arrow {
+          position: fixed;
+          top: 50%;
+          transform: translateY(-50%);
+          background: rgba(255, 255, 255, 0.95);
+          border: 1px solid #ddd;
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          font-size: 18px;
+          font-weight: bold;
+          color: #007bff;
+          z-index: 80;
+          transition: all 0.2s ease;
+          backdrop-filter: blur(8px);
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .scroll-arrow:hover {
+          background: white;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          transform: translateY(-50%) scale(1.1);
+          color: #0056b3;
+        }
+
+        .scroll-arrow-left {
+          left: ${Math.max(gridPosition.left + 16, 16)}px;
+        }
+
+        .scroll-arrow-right {
+          right: ${Math.max(windowWidth - (gridPosition.left + gridPosition.width) + 16, 16)}px;
         }
 
         @media (max-width: 768px) {
@@ -646,7 +786,7 @@ export function Planning() {
           }
 
           .planning-grid-wrapper {
-            min-width: ${data.classes?.length ? data.classes.length * 120 + 120 : 600}px;
+            min-width: ${data.classes?.length ? data.classes.length * 120 + 80 : 560}px;
           }
 
           .classes-indicator {
@@ -677,7 +817,7 @@ export function Planning() {
           }
 
           .planning-grid-wrapper {
-            min-width: ${data.classes?.length ? data.classes.length * 100 + 100 : 500}px;
+            min-width: ${data.classes?.length ? data.classes.length * 100 + 60 : 460}px;
           }
 
           .scroll-hint {

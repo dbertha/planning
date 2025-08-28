@@ -27,7 +27,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
     email: '',
     telephone: '',
     telephone2: '',
-    nb_nettoyage: 3,
+    nb_nettoyage: 4,
     classes_preferences: [],
     notes: ''
   });
@@ -101,7 +101,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         email: '',
         telephone: '',
         telephone2: '',
-        nb_nettoyage: 3,
+        nb_nettoyage: 4,
         classes_preferences: [],
         notes: ''
       });
@@ -188,10 +188,32 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
         throw new Error('Le fichier doit contenir au moins une ligne d\'en-tête et une ligne de données');
       }
 
-      // Parser le CSV
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      // Parser le CSV en tenant compte des virgules dans les guillemets
+      const parseCSVLine = (line) => {
+        const values = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        
+        values.push(current.trim());
+        return values;
+      };
+      
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/"/g, ''));
       const familles = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+        const values = parseCSVLine(line).map(v => v.replace(/"/g, ''));
         const famille = {};
         headers.forEach((header, index) => {
           famille[header] = values[index] || '';

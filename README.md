@@ -297,7 +297,7 @@ POST /api/familles
 ### **Règles de Validation**
 - **nom** : Obligatoire
 - **telephone** : **OBLIGATOIRE** pour SMS
-- **nb_nettoyage** : Entre 1 et 10 (défaut: 3)
+- **nb_nettoyage** : Entre 1 et 10 (défaut: 4)
 - **classes_preferences** : IDs séparés par virgule
 
 ## 🔐 **Système de Permissions**

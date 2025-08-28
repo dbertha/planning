@@ -36,7 +36,7 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
         
         .classes-header-grid {
           display: grid;
-          grid-template-columns: repeat(${classes.length}, minmax(150px, 1fr));
+          grid-template-columns: repeat(${classes.length}, 1fr);
           gap: 1px;
           background: #ddd;
           width: 100%;
