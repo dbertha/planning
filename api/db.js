@@ -1,11 +1,7 @@
-import { Pool } from '@neondatabase/serverless';
+import { Pool } from 'pg';
 import crypto from 'crypto';
-import ws from 'ws';
 
-// Configuration WebSocket pour Neon en dev local
-if (typeof WebSocket === 'undefined') {
-  global.WebSocket = ws;
-}
+console.log('🗄️ Utilisation du driver: PostgreSQL standard (VPS)');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL
@@ -34,14 +30,14 @@ export const hashPassword = (password) => {
 // Initialiser les tables si elles n'existent pas
 export const initDatabase = async () => {
   try {
-    // Table des plannings (master table)
+    // Table des plannings (master table) - Schéma Neon
     await query(`
       CREATE TABLE IF NOT EXISTS plannings (
         id SERIAL PRIMARY KEY,
         token VARCHAR(64) UNIQUE NOT NULL,
-        name TEXT NOT NULL,
+        name VARCHAR(255) NOT NULL,
         description TEXT,
-        year INTEGER,
+        annee_scolaire INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_active BOOLEAN DEFAULT true
@@ -56,12 +52,12 @@ export const initDatabase = async () => {
       console.log('Migration: admin_password_hash column removal completed or already done');
     }
 
-    // Table des classes (zones de nettoyage)
+    // Table des classes (zones de nettoyage) - Schéma Neon
     await query(`
       CREATE TABLE IF NOT EXISTS classes (
         id VARCHAR(20),
         planning_id INTEGER REFERENCES plannings(id) ON DELETE CASCADE,
-        nom TEXT NOT NULL,
+        nom VARCHAR(255) NOT NULL,
         couleur VARCHAR(7) NOT NULL,
         ordre INTEGER DEFAULT 0,
         description TEXT,
@@ -87,20 +83,19 @@ export const initDatabase = async () => {
       }
     }
 
-    // Table des familles (téléphone obligatoire pour SMS)
+    // Table des familles (téléphone obligatoire pour SMS) - Schéma Neon
     await query(`
       CREATE TABLE IF NOT EXISTS familles (
         id SERIAL PRIMARY KEY,
         planning_id INTEGER REFERENCES plannings(id) ON DELETE CASCADE,
-        nom TEXT NOT NULL,
-        email TEXT,
-        telephone TEXT NOT NULL, -- OBLIGATOIRE pour les SMS
+        nom VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        telephone VARCHAR(255) NOT NULL, -- OBLIGATOIRE pour les SMS
         telephone2 TEXT, -- Deuxième numéro de téléphone (optionnel)
         nb_nettoyage INTEGER DEFAULT 3,
         classes_preferences TEXT[], -- Array des IDs de classes préférées
         notes TEXT,
         is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(nom, planning_id) -- Éviter les doublons de famille par planning
       );
@@ -207,12 +202,10 @@ export const initDatabase = async () => {
       CREATE TABLE IF NOT EXISTS imports (
         id SERIAL PRIMARY KEY,
         planning_id INTEGER REFERENCES plannings(id) ON DELETE CASCADE,
-        type VARCHAR(20) NOT NULL, -- familles, classes, semaines
-        filename TEXT,
-        nb_lines INTEGER,
-        nb_success INTEGER,
-        nb_errors INTEGER,
-        errors_detail JSONB,
+        filename VARCHAR(255),
+        total_families INTEGER,
+        successful_imports INTEGER,
+        errors TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);

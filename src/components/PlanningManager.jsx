@@ -11,7 +11,7 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
   const [createData, setCreateData] = useState({
     name: '',
     description: '',
-    year: new Date().getFullYear(),
+    annee_scolaire: new Date().getFullYear(),
     customToken: ''
   });
   const [switchToken, setSwitchToken] = useState('');
@@ -45,7 +45,7 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
       setCreateData({
         name: '',
         description: '',
-        year: new Date().getFullYear(),
+        annee_scolaire: new Date().getFullYear(),
         customToken: ''
       });
       setShowCreateForm(false);
@@ -114,7 +114,7 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
             <div className="planning-description">{currentPlanning.description}</div>
           )}
           <div className="planning-meta">
-            <span className="planning-year">📅 Année: {currentPlanning?.year || 'Non définie'}</span>
+            <span className="planning-year">📅 Année: {currentPlanning?.annee_scolaire || 'Non définie'}</span>
             <span className="planning-token">🔑 Token: {currentPlanning?.token || 'Non défini'}</span>
           </div>
         </div>
@@ -193,8 +193,8 @@ export function PlanningManager({ currentPlanning, isAdmin, onSwitchPlanning }) 
               <label>Année scolaire :</label>
               <input
                 type="number"
-                value={createData.year}
-                onChange={(e) => setCreateData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                value={createData.annee_scolaire}
+                onChange={(e) => setCreateData(prev => ({ ...prev, annee_scolaire: parseInt(e.target.value) }))}
                 min="2020"
                 max="2040"
               />

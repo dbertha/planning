@@ -767,6 +767,137 @@ async function testTwilioPersonalNumber() {
 }
 
 /**
+ * Test spécifique pour SMSFactor vers le numéro personnel
+ */
+async function testSMSFactorPersonalNumber() {
+  console.log('\n🧪 Tests SMSFactor - Numéro personnel');
+  console.log('====================================');
+  
+  const runner = new SMSTestRunner();
+  
+  await runner.test('Configuration SMSFactor', async () => {
+    const response = await fetch(`${API_BASE_URL}/api/sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'test_config'
+      })
+    });
+    
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Configuration SMSFactor échouée');
+    }
+    
+    console.log(`📱 Provider: ${result.provider}`);
+    console.log(`🔧 Mode test: ${result.config.testMode}`);
+    assertEqual(result.provider, 'smsfactor', 'Provider devrait être SMSFactor');
+  });
+
+  await runner.test('Connexion API SMSFactor', async () => {
+    const response = await fetch(`${API_BASE_URL}/api/sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'test_connection'
+      })
+    });
+    
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Connexion API SMSFactor échouée');
+    }
+    
+    console.log(`🏢 API SMSFactor: ${result.message}`);
+    console.log(`📊 Mode test: ${result.data.testMode}`);
+  });
+
+  await runner.test('Envoi SMS vers numéro personnel (TEST MODE)', async () => {
+    // Ce test envoie vers votre numéro en mode test (simulation sans SMS réel)
+    const testNumber = process.env.TEST_PHONE_NUMBER || '0032497890341';
+    
+    const response = await fetch(`${API_BASE_URL}/api/sms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: 'test-token', // Token factice pour le test
+        action: 'send_to_famille',
+        data: {
+          famille_id: 'test',
+          template_key: 'personnalise',
+          message_personnalise: `Test SMSFactor depuis Planning App - ${new Date().toLocaleTimeString()}`,
+          template_data: {
+            nom_famille: 'Test',
+            planning_name: 'Planning Test'
+          },
+          // Forcer l'envoi vers le numéro de test
+          overridePhone: testNumber
+        }
+      })
+    });
+    
+    const result = await response.json();
+    
+    // En mode test, on s'attend à une simulation réussie
+    if (result.success && result.results[0].testMode) {
+      console.log(`📱 SMS test simulé vers: ${result.results[0].recipient}`);
+      console.log(`📝 Message: ${result.results[0].message}`);
+      console.log(`🆔 ID: ${result.results[0].messageId}`);
+      console.log(`🏷️ Provider: ${result.results[0].provider}`);
+      assertEqual(result.results[0].provider, 'smsfactor', 'Provider devrait être SMSFactor');
+    } else if (result.success && !result.results[0].testMode) {
+      console.log(`⚠️ Attention: Test en mode PRODUCTION - SMS réellement envoyé !`);
+      console.log(`📱 SMS envoyé vers: ${result.results[0].recipient}`);
+      console.log(`🆔 ID: ${result.results[0].messageId}`);
+      console.log(`💰 Coût: ${result.results[0].cost} crédit(s)`);
+      console.log(`💳 Crédits restants: ${result.results[0].credits}`);
+    } else {
+      throw new Error(result.error || 'Envoi SMS test échoué');
+    }
+  });
+
+  await runner.test('Test normalisation numéros SMSFactor', async () => {
+    // Test avec différents formats de numéros
+    const testNumbers = [
+      '0032497890341',  // Format belge avec 0032
+      '+32497890341',   // Format international avec +
+      '0497890341',     // Format national belge
+      '33612345678',    // Format français
+      '+33612345678'    // Format français international
+    ];
+
+    for (const testNumber of testNumbers) {
+      const response = await fetch(`${API_BASE_URL}/api/sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: 'test-token',
+          action: 'send_to_famille',
+          data: {
+            famille_id: 'test',
+            template_key: 'personnalise',
+            message_personnalise: `Test normalisation: ${testNumber}`,
+            overridePhone: testNumber
+          }
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${testNumber} → ${result.results[0].recipient}`);
+        // Vérifier que le numéro normalisé ne contient pas de +
+        assert(!result.results[0].recipient.includes('+'), 'Le numéro SMSFactor ne devrait pas contenir de +');
+      } else {
+        throw new Error(`Échec normalisation pour ${testNumber}: ${result.error}`);
+      }
+    }
+  });
+
+  return runner.summary();
+}
+
+/**
  * Point d'entrée principal
  */
 async function runAllTests() {
@@ -787,6 +918,11 @@ async function runAllTests() {
   if (process.env.SMS_PROVIDER === 'twilio') {
     results.twilio = await testTwilioPersonalNumber();
   }
+  
+  // Test spécifique SMSFactor si configuré
+  if (process.env.SMS_PROVIDER === 'smsfactor') {
+    results.smsfactor = await testSMSFactorPersonalNumber();
+  }
 
   // Résumé global
   console.log('\n📊 Résumé des tests SMS:');
@@ -795,6 +931,9 @@ async function runAllTests() {
   console.log(`   Validation: ${results.validation ? '✅ RÉUSSI' : '❌ ÉCHEC'}`);
   if (results.twilio !== undefined) {
     console.log(`   Test Twilio personnel: ${results.twilio ? '✅ RÉUSSI' : '❌ ÉCHEC'}`);
+  }
+  if (results.smsfactor !== undefined) {
+    console.log(`   Test SMSFactor personnel: ${results.smsfactor ? '✅ RÉUSSI' : '❌ ÉCHEC'}`);
   }
 
   const allPassed = Object.values(results).every(Boolean);

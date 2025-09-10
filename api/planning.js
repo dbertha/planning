@@ -132,7 +132,7 @@ async function handleGet(req, res) {
         planning: {
           name: planning.name,
           description: planning.description,
-          year: planning.annee_scolaire,
+          annee_scolaire: planning.annee_scolaire,
           token: planning.token
         },
         classes: classesResult.rows,
@@ -239,7 +239,7 @@ async function handleGet(req, res) {
           return res.status(200).json({
             name: planning.name,
             description: planning.description,
-            year: planning.annee_scolaire,
+            annee_scolaire: planning.annee_scolaire,
             created_at: planning.created_at,
             token: planning.token,
             hasAdminPassword: !!(process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'),

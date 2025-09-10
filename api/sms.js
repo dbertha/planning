@@ -14,12 +14,13 @@ import { corsMiddlewareSMS } from './middleware.js';
 
 const SPRYNG_BASE_URL = 'https://rest.spryngsms.com/v1';
 const TWILIO_BASE_URL = 'https://api.twilio.com/2010-04-01';
+const SMSFACTOR_BASE_URL = 'https://api.smsfactor.com';
 
 /**
  * Configuration SMS depuis les variables d'environnement
  */
 const SMS_CONFIG = {
-  // Provider selection (twilio or spryng)
+  // Provider selection (twilio, spryng, or smsfactor)
   provider: process.env.SMS_PROVIDER || 'spryng',
   enabled: process.env.SMS_ENABLED === 'true',
   testMode: process.env.NODE_ENV !== 'production',
@@ -36,6 +37,12 @@ const SMS_CONFIG = {
     accountSid: process.env.TWILIO_SID,
     authToken: process.env.TWILIO_AUTH_TOKEN,
     phoneNumber: process.env.TWILIO_SENDER
+  },
+  
+  // SMSFactor configuration
+  smsfactor: {
+    apiToken: process.env.SMS_FACTOR_API_TOKEN,
+    sender: process.env.SMS_SENDER || 'Planning'
   }
 };
 
@@ -479,6 +486,196 @@ class TwilioSMSService extends BaseSMSService {
 }
 
 /**
+ * Classe pour la gestion des SMS via SMSFactor
+ */
+class SMSFactorSMSService extends BaseSMSService {
+  constructor() {
+    super();
+    this.provider = 'smsfactor';
+    this.apiToken = SMS_CONFIG.smsfactor.apiToken;
+    this.sender = SMS_CONFIG.smsfactor.sender;
+  }
+
+  /**
+   * Valider la configuration SMS SMSFactor
+   */
+  validateConfig() {
+    if (!SMS_CONFIG.enabled) {
+      throw new Error('Service SMS désactivé');
+    }
+    
+    if (!this.apiToken) {
+      throw new Error('SMS_FACTOR_API_TOKEN manquant dans la configuration');
+    }
+
+    // Valider l'expéditeur : soit un numéro (commence par + ou chiffres), soit un nom alphanumérique (max 11 chars)
+    const isPhoneNumber = /^(\+|[0-9])/.test(this.sender);
+    if (!isPhoneNumber && this.sender.length > 11) {
+      throw new Error('Nom expéditeur alphanumérique doit faire maximum 11 caractères. Utilisez un numéro de téléphone pour un expéditeur plus long.');
+    }
+  }
+
+  /**
+   * Tester la connexion à l'API SMSFactor (appel GET simple pour vérifier les crédits)
+   */
+  async testConnection() {
+    try {
+      this.validateConfig();
+
+      console.log(`🔍 Test de connexion à l'API SMSFactor...`);
+
+      // Test sûr: Envoyer un SMS de test vers un numéro invalide pour vérifier la connexion
+      // sans consommer de crédits réels
+      const testResponse = await fetch(`${SMSFACTOR_BASE_URL}/send?text=test&to=33000000000&token=${this.apiToken}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      let responseData = null;
+      try {
+        responseData = await testResponse.json();
+      } catch (error) {
+        // Si la réponse n'est pas JSON, on considère que c'est une erreur
+      }
+
+      // SMSFactor retourne un statut même pour les numéros invalides
+      // Un status négatif ou une erreur d'authentification indique un problème de config
+      if (responseData && (responseData.status === -1 || responseData.status === -2)) {
+        throw new Error(`Erreur authentification SMSFactor: ${responseData.message}`);
+      }
+
+      console.log(`💰 Test SMSFactor réussi`);
+      
+      return {
+        success: true,
+        apiConnected: true,
+        testMode: SMS_CONFIG.testMode,
+        message: `API SMSFactor connectée - Token valide`
+      };
+
+    } catch (error) {
+      console.error(`❌ Erreur connexion API SMSFactor:`, error.message);
+      return {
+        success: false,
+        apiConnected: false,
+        error: error.message,
+        testMode: SMS_CONFIG.testMode
+      };
+    }
+  }
+
+  /**
+   * Normaliser un numéro de téléphone pour SMSFactor (format international sans +)
+   */
+  normalizePhoneNumber(phone) {
+    if (!phone) throw new Error('Numéro de téléphone manquant');
+    
+    // Retirer tous les espaces et caractères non-numériques sauf +
+    let cleaned = phone.replace(/[^\d+]/g, '');
+    
+    // Si commence par 0032, remplacer par 32
+    if (cleaned.startsWith('0032')) {
+      cleaned = '32' + cleaned.substring(4);
+    }
+    // Si commence par +, le retirer
+    else if (cleaned.startsWith('+')) {
+      cleaned = cleaned.substring(1);
+    }
+    // Si commence par 00, remplacer par rien
+    else if (cleaned.startsWith('00')) {
+      cleaned = cleaned.substring(2);
+    }
+    // Si ne commence pas par un indicatif international, ajouter 32 (Belgique par défaut)
+    else if (!cleaned.startsWith('32') && !cleaned.startsWith('33') && !cleaned.startsWith('1')) {
+      if (cleaned.startsWith('0')) {
+        cleaned = '32' + cleaned.substring(1);
+      } else {
+        cleaned = '32' + cleaned;
+      }
+    }
+    
+    return cleaned;
+  }
+
+  /**
+   * Envoyer un SMS via l'API SMSFactor
+   */
+  async sendSMS(to, message, options = {}) {
+    try {
+      this.validateConfig();
+      
+      const normalizedTo = this.normalizePhoneNumber(to);
+      if (!normalizedTo) {
+        throw new Error('Numéro de téléphone invalide');
+      }
+
+      console.log(`📱 Envoi SMS${SMS_CONFIG.testMode ? ' (TEST)' : ''}: ${normalizedTo}`);
+      console.log(`📄 Contenu: ${message}`);
+
+      if (SMS_CONFIG.testMode) {
+        // Mode test : simuler l'envoi
+        return {
+          success: true,
+          messageId: 'test_smsfactor_' + Date.now(),
+          cost: 1,
+          testMode: true,
+          recipient: normalizedTo,
+          message: message,
+          provider: 'smsfactor'
+        };
+      }
+
+      // Construction de l'URL avec les paramètres
+      const params = new URLSearchParams({
+        text: message.substring(0, 1600), // Limite raisonnable
+        to: normalizedTo,
+        token: this.apiToken,
+        pushtype: 'alert', // Type d'envoi par défaut
+        ...(options.sender && { sender: options.sender })
+      });
+
+      const response = await fetch(`${SMSFACTOR_BASE_URL}/send?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP SMSFactor (${response.status}): ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Vérifier le statut de la réponse SMSFactor
+      if (result.status < 0) {
+        throw new Error(`Erreur SMSFactor (${result.status}): ${result.message}`);
+      }
+
+      console.log(`✅ SMS SMSFactor envoyé avec succès: ticket ${result.ticket}`);
+
+      return {
+        success: true,
+        messageId: result.ticket,
+        cost: result.cost || 1,
+        recipient: normalizedTo,
+        message: message,
+        credits: result.credits,
+        provider: 'smsfactor',
+        sent: result.sent,
+        total: result.total
+      };
+
+    } catch (error) {
+      console.error('❌ Erreur envoi SMS SMSFactor:', error.message);
+      throw error;
+    }
+  }
+}
+
+/**
  * Factory pour créer le service SMS approprié
  */
 export function createSMSService() {
@@ -491,8 +688,10 @@ export function createSMSService() {
       return new TwilioSMSService();
     case 'spryng':
       return new SpryngSMSService();
+    case 'smsfactor':
+      return new SMSFactorSMSService();
     default:
-      throw new Error(`Provider SMS non supporté: ${provider}. Utilisez 'twilio' ou 'spryng'`);
+      throw new Error(`Provider SMS non supporté: ${provider}. Utilisez 'twilio', 'spryng' ou 'smsfactor'`);
   }
 }
 

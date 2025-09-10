@@ -296,29 +296,46 @@ async function handlePut(req, res) {
 
       res.status(200).json(result.rows[0]);
     } else {
-      // Mise à jour d'une famille - validation des données
-      await validateFamilleData(data, planning.id, true);
+      // Vérifier si c'est une mise à jour partielle (comme l'archivage)
+      const isPartialUpdate = Object.keys(data).length === 1 && ('is_active' in data);
+      
+      if (isPartialUpdate) {
+        // Mise à jour partielle (archivage/restauration) - pas de validation complète
+        const result = await query(
+          'UPDATE familles SET is_active = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND planning_id = $3 RETURNING *',
+          [data.is_active, id, planning.id]
+        );
 
-      const result = await query(
-        'UPDATE familles SET nom = $1, email = $2, telephone = $3, telephone2 = $4, nb_nettoyage = $5, classes_preferences = $6, notes = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $8 AND planning_id = $9 RETURNING *',
-        [
-          data.nom, 
-          data.email, 
-          data.telephone?.trim(), 
-          data.telephone2?.trim() || null,
-          data.nb_nettoyage, 
-          data.classes_preferences || [], 
-          data.notes, 
-          id, 
-          planning.id
-        ]
-      );
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'Famille non trouvée' });
+        }
 
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Famille non trouvée' });
+        res.status(200).json(result.rows[0]);
+      } else {
+        // Mise à jour complète d'une famille - validation des données
+        await validateFamilleData(data, planning.id, true);
+
+        const result = await query(
+          'UPDATE familles SET nom = $1, email = $2, telephone = $3, telephone2 = $4, nb_nettoyage = $5, classes_preferences = $6, notes = $7, updated_at = CURRENT_TIMESTAMP WHERE id = $8 AND planning_id = $9 RETURNING *',
+          [
+            data.nom, 
+            data.email, 
+            data.telephone?.trim(), 
+            data.telephone2?.trim() || null,
+            data.nb_nettoyage, 
+            data.classes_preferences || [], 
+            data.notes, 
+            id, 
+            planning.id
+          ]
+        );
+
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'Famille non trouvée' });
+        }
+
+        res.status(200).json(result.rows[0]);
       }
-
-      res.status(200).json(result.rows[0]);
     }
   } catch (error) {
     handleApiError(error, res, 'PUT familles');

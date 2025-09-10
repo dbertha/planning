@@ -61,7 +61,7 @@ async function handleGet(req, res) {
             token: sessionInfo.planning.token,
             name: sessionInfo.planning.name,
             description: sessionInfo.planning.description,
-            year: sessionInfo.planning.annee_scolaire
+            annee_scolaire: sessionInfo.planning.annee_scolaire
           },
           session: {
             expires_at: sessionInfo.session.expires_at
@@ -84,7 +84,7 @@ async function handleGet(req, res) {
           token: planning.token,
           name: planning.name,
           description: planning.description,
-          year: planning.annee_scolaire,
+          annee_scolaire: planning.annee_scolaire,
           hasAdminPassword,
           isPublic: !hasAdminPassword // Planning public si pas de mot de passe admin
         });
@@ -127,7 +127,7 @@ async function handlePost(req, res) {
               token: authResult.planning.token,
               name: authResult.planning.name,
               description: authResult.planning.description,
-              year: authResult.planning.annee_scolaire
+              annee_scolaire: authResult.planning.annee_scolaire
             }
           });
         } catch (authError) {
@@ -140,7 +140,7 @@ async function handlePost(req, res) {
 
       case 'create_planning':
         // Créer un nouveau planning
-        const { name, description, year, customToken } = data;
+        const { name, description, annee_scolaire, customToken } = data;
         
         if (!name) {
           return res.status(400).json({ error: 'Nom du planning requis' });
@@ -149,7 +149,7 @@ async function handlePost(req, res) {
         const newPlanning = await createPlanning(
           name, 
           description, 
-          parseInt(year) || new Date().getFullYear(),
+          parseInt(annee_scolaire) || new Date().getFullYear(),
           customToken
         );
 

@@ -91,13 +91,76 @@ function createSMSServiceForCron() {
         };
       }
     };
+  } else if (provider === 'smsfactor') {
+    return {
+      sendSMS: async (to, message, templateData = {}) => {
+        const apiToken = process.env.SMS_FACTOR_API_TOKEN;
+        const sender = process.env.SMS_SENDER || 'Planning';
+        
+        if (!apiToken) {
+          throw new Error('Configuration SMSFactor incomplète');
+        }
+
+        // Normaliser le numéro pour SMSFactor (format international sans +)
+        const normalizedTo = normalizeSMSFactorPhoneNumber(to);
+        
+        if (SMS_CONFIG.testMode) {
+          console.log(`📱 [MODE TEST] SMS SMSFactor vers ${normalizedTo}: ${message}`);
+          return {
+            success: true,
+            testMode: true,
+            messageId: `test_smsfactor_cron_${Date.now()}`,
+            to: normalizedTo,
+            message: message,
+            provider: 'smsfactor'
+          };
+        }
+
+        // Envoi réel via SMSFactor
+        const params = new URLSearchParams({
+          text: message.substring(0, 1600),
+          to: normalizedTo,
+          token: apiToken,
+          pushtype: 'alert',
+          sender: sender
+        });
+
+        const response = await fetch(`https://api.smsfactor.com/send?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`SMSFactor API erreur ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.status < 0) {
+          throw new Error(`SMSFactor erreur (${result.status}): ${result.message}`);
+        }
+
+        return {
+          success: true,
+          testMode: false,
+          messageId: result.ticket,
+          to: normalizedTo,
+          message: message,
+          cost: result.cost,
+          credits: result.credits,
+          provider: 'smsfactor'
+        };
+      }
+    };
   } else {
-    throw new Error(`Provider SMS non supporté pour CRON: ${provider}`);
+    throw new Error(`Provider SMS non supporté pour CRON: ${provider}. Utilisez 'twilio' ou 'smsfactor'`);
   }
 }
 
 /**
- * Normaliser un numéro de téléphone
+ * Normaliser un numéro de téléphone (pour Twilio - format E.164)
  */
 function normalizePhoneNumber(phone) {
   if (!phone) throw new Error('Numéro de téléphone manquant');
@@ -113,6 +176,39 @@ function normalizePhoneNumber(phone) {
       cleaned = '+32' + cleaned.substring(1);
     } else {
       cleaned = '+32' + cleaned;
+    }
+  }
+  
+  return cleaned;
+}
+
+/**
+ * Normaliser un numéro de téléphone pour SMSFactor (format international sans +)
+ */
+function normalizeSMSFactorPhoneNumber(phone) {
+  if (!phone) throw new Error('Numéro de téléphone manquant');
+  
+  // Retirer tous les espaces et caractères non-numériques sauf +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Si commence par 0032, remplacer par 32
+  if (cleaned.startsWith('0032')) {
+    cleaned = '32' + cleaned.substring(4);
+  }
+  // Si commence par +, le retirer
+  else if (cleaned.startsWith('+')) {
+    cleaned = cleaned.substring(1);
+  }
+  // Si commence par 00, remplacer par rien
+  else if (cleaned.startsWith('00')) {
+    cleaned = cleaned.substring(2);
+  }
+  // Si ne commence pas par un indicatif international, ajouter 32 (Belgique par défaut)
+  else if (!cleaned.startsWith('32') && !cleaned.startsWith('33') && !cleaned.startsWith('1')) {
+    if (cleaned.startsWith('0')) {
+      cleaned = '32' + cleaned.substring(1);
+    } else {
+      cleaned = '32' + cleaned;
     }
   }
   

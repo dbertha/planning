@@ -373,8 +373,8 @@ export function Planning() {
           {data.planning?.description && (
             <p className="planning-description">{data.planning.description}</p>
           )}
-          {data.planning?.year && (
-            <span className="planning-year">Année {data.planning.year}</span>
+          {data.planning?.annee_scolaire && (
+            <span className="planning-year">Année {data.planning.annee_scolaire}</span>
           )}
         </div>
 
