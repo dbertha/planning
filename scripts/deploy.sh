@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")/.."
 
-LOGFILE="/var/log/ecole-deploy.log"
+LOGFILE="./logs/ecole-deploy.log"
 echo "[$(date -Iseconds)] Début du déploiement" | tee -a "$LOGFILE"
 
 # Config
@@ -49,11 +49,11 @@ docker compose up -d --build --remove-orphans
 
 # 5. Optionnel : lancer migrations si le service expose la commande
 if docker compose ps --status running | grep -q "$APP_SERVICE_NAME"; then
-  if docker compose exec -T "$APP_SERVICE_NAME" bash -lc "command -v node >/dev/null 2>&1 && test -f package.json"; then
+  if docker compose exec -T "$APP_SERVICE_NAME" sh -lc "command -v node >/dev/null 2>&1 && test -f package.json"; then
     echo "[$(date -Iseconds)] Détection du service $APP_SERVICE_NAME : tentative de migrations" | tee -a "$LOGFILE"
     # Exemple : si ta container a un script npm run migrate
     set +e
-    docker compose exec -T "$APP_SERVICE_NAME" bash -lc "$MIGRATION_CMD"
+    docker compose exec -T "$APP_SERVICE_NAME" sh -lc "$MIGRATION_CMD"
     MIG_RET=$?
     set -e
     if [ "$MIG_RET" -ne 0 ]; then
