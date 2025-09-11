@@ -44,17 +44,20 @@ if [ "${ENABLE_SSL:-}" = "true" ] && [ -n "${APP_DOMAIN:-}" ]; then
 fi
 
 # 5. Build & up : construire images locales et démarrer
-echo "[$(date -Iseconds)] docker compose up -d --build --remove-orphans" | tee -a "$LOGFILE"
-docker compose up -d --build --remove-orphans
+echo "[$(date -Iseconds)] docker compose up -d --build --remove-orphans --force-recreate" | tee -a "$LOGFILE"
+docker compose up -d --build --remove-orphans --force-recreate
 
-# 5.1. Vérifier que les fichiers statiques sont à jour
-echo "[$(date -Iseconds)] Vérification des fichiers statiques" | tee -a "$LOGFILE"
-if [ -f "dist/index.html" ]; then
-    DIST_TIMESTAMP=$(stat -c %Y dist/index.html)
-    echo "[$(date -Iseconds)] Timestamp du fichier dist/index.html: $DIST_TIMESTAMP" | tee -a "$LOGFILE"
-    ls -la dist/ | head -5 | tee -a "$LOGFILE"
+# 5.1. Vérifier et copier les fichiers statiques depuis le conteneur
+echo "[$(date -Iseconds)] Vérification des fichiers statiques dans le conteneur" | tee -a "$LOGFILE"
+if docker compose exec -T "$APP_SERVICE_NAME" ls -la /app/dist/ >/dev/null 2>&1; then
+    echo "[$(date -Iseconds)] Fichiers statiques trouvés dans le conteneur:" | tee -a "$LOGFILE"
+    docker compose exec -T "$APP_SERVICE_NAME" ls -la /app/dist/ | head -5 | tee -a "$LOGFILE"
+    
+    # Vérifier le volume partagé
+    echo "[$(date -Iseconds)] Vérification du volume partagé static_files" | tee -a "$LOGFILE"
+    docker compose exec -T nginx ls -la /usr/share/nginx/html/ | head -5 | tee -a "$LOGFILE"
 else
-    echo "[$(date -Iseconds)] ⚠️ Fichier dist/index.html non trouvé!" | tee -a "$LOGFILE"
+    echo "[$(date -Iseconds)] ⚠️ Fichiers statiques non trouvés dans le conteneur!" | tee -a "$LOGFILE"
 fi
 
 # 5.2. Forcer le rechargement de Nginx pour éviter les problèmes de cache
