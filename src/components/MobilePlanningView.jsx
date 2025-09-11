@@ -167,6 +167,17 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
                                 style={{ backgroundColor: affectation.classeCouleur }}
                               ></span>
                               <span className="class-name">{affectation.classeNom}</span>
+                              {classe && classe.instructions_pdf_url && (
+                                <a 
+                                  href={classe.instructions_pdf_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="assignment-pdf-link"
+                                  title="Instructions de nettoyage (PDF)"
+                                >
+                                  📄
+                                </a>
+                              )}
                             </div>
                             {!isAdmin && classe && famille && filters?.search && (
                               affectation?.familleNom?.toLowerCase().includes(filters.search.toLowerCase()) || 
@@ -358,6 +369,23 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
           font-weight: 500;
           color: #495057;
           font-size: 14px;
+        }
+
+        .assignment-pdf-link {
+          color: #495057;
+          text-decoration: none;
+          font-size: 12px;
+          opacity: 0.8;
+          transition: all 0.2s;
+          padding: 2px 4px;
+          border-radius: 3px;
+          margin-left: 4px;
+        }
+
+        .assignment-pdf-link:hover {
+          opacity: 1;
+          background: rgba(0, 0, 0, 0.1);
+          transform: scale(1.1);
         }
 
         .assignment-family {

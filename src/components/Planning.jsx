@@ -433,8 +433,22 @@ export function Planning() {
                 style={{ backgroundColor: classe.couleur }}
               />
               <div className="legend-text">
-                {classe.nom}
+                <div className="legend-nom">{classe.nom}</div>
+                {classe.description && (
+                  <div className="legend-description">{classe.description}</div>
+                )}
               </div>
+              {classe.instructions_pdf_url && (
+                <a 
+                  href={classe.instructions_pdf_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="legend-pdf-link"
+                  title="Instructions de nettoyage (PDF)"
+                >
+                  📄
+                </a>
+              )}
             </div>
           ))}
         </div>
@@ -642,6 +656,37 @@ export function Planning() {
         .legend-text {
           font-size: 12px;
           font-weight: 500;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .legend-nom {
+          font-weight: 500;
+        }
+
+        .legend-description {
+          font-size: 10px;
+          font-weight: 400;
+          color: #666;
+          line-height: 1.2;
+        }
+
+        .legend-pdf-link {
+          color: #333;
+          text-decoration: none;
+          font-size: 14px;
+          opacity: 0.8;
+          transition: all 0.2s;
+          padding: 4px;
+          border-radius: 4px;
+          flex-shrink: 0;
+        }
+
+        .legend-pdf-link:hover {
+          opacity: 1;
+          background: rgba(0, 0, 0, 0.1);
+          transform: scale(1.1);
         }
 
         .mobile-layout {

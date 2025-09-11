@@ -152,8 +152,12 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
                 key={classe.id} 
                 className="classe-header"
                 style={{ backgroundColor: classe.couleur }}
+                title={classe.description ? `${classe.nom}: ${classe.description}` : classe.nom}
               >
                 <div className="classe-nom">{classe.nom}</div>
+                {classe.description && (
+                  <div className="classe-description">{classe.description}</div>
+                )}
                 {classe.instructions_pdf_url && (
                   <a 
                     href={classe.instructions_pdf_url} 
@@ -232,6 +236,18 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
           line-height: 1.2;
           word-wrap: break-word;
           hyphens: auto;
+        }
+
+        .classe-description {
+          font-size: 9px;
+          line-height: 1.2;
+          color: rgba(255, 255, 255, 0.8);
+          text-align: center;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+          margin-top: 2px;
+          font-weight: 400;
         }
 
         .pdf-instructions {

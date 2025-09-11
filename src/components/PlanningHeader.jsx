@@ -11,8 +11,12 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
               key={classe.id} 
               className="classe-header"
               style={{ backgroundColor: classe.couleur }}
+              title={classe.description ? `${classe.nom}: ${classe.description}` : classe.nom}
             >
               <div className="classe-nom">{classe.nom}</div>
+              {classe.description && (
+                <div className="classe-description">{classe.description}</div>
+              )}
               {classe.instructions_pdf_url && (
                 <a 
                   href={classe.instructions_pdf_url} 
@@ -62,7 +66,6 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
         }
 
         .classe-nom {
-          flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -72,6 +75,18 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 100%;
+        }
+
+        .classe-description {
+          font-size: 9px;
+          line-height: 1.2;
+          color: rgba(51, 51, 51, 0.8);
+          text-align: center;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+          margin-top: 2px;
+          font-weight: 400;
         }
 
         .pdf-instructions {
