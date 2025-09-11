@@ -47,6 +47,20 @@ fi
 echo "[$(date -Iseconds)] docker compose up -d --build --remove-orphans" | tee -a "$LOGFILE"
 docker compose up -d --build --remove-orphans
 
+# 5.1. Vérifier que les fichiers statiques sont à jour
+echo "[$(date -Iseconds)] Vérification des fichiers statiques" | tee -a "$LOGFILE"
+if [ -f "dist/index.html" ]; then
+    DIST_TIMESTAMP=$(stat -c %Y dist/index.html)
+    echo "[$(date -Iseconds)] Timestamp du fichier dist/index.html: $DIST_TIMESTAMP" | tee -a "$LOGFILE"
+    ls -la dist/ | head -5 | tee -a "$LOGFILE"
+else
+    echo "[$(date -Iseconds)] ⚠️ Fichier dist/index.html non trouvé!" | tee -a "$LOGFILE"
+fi
+
+# 5.2. Forcer le rechargement de Nginx pour éviter les problèmes de cache
+echo "[$(date -Iseconds)] Rechargement de Nginx pour appliquer les nouvelles ressources" | tee -a "$LOGFILE"
+docker compose exec -T nginx nginx -s reload || echo "Nginx reload failed, but continuing" | tee -a "$LOGFILE"
+
 # 5. Optionnel : lancer migrations si le service expose la commande
 if docker compose ps --status running | grep -q "$APP_SERVICE_NAME"; then
   if docker compose exec -T "$APP_SERVICE_NAME" sh -lc "command -v node >/dev/null 2>&1 && test -f package.json"; then

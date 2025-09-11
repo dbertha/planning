@@ -41,6 +41,7 @@ jobs:
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          log-public-key: false
 
       - name: Validate DEPLOY_SECRETS exists
         run: |

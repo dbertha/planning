@@ -19,6 +19,7 @@
     "docker:build": "docker build -t ecole-planning .",
     "docker:run": "docker run -p 3000:3000 --env-file .env ecole-planning",
     "backup": "./backup.sh",
+    "migrate": "echo 'No database migrations needed for this project'",
     "ssl:init": "./init-letsencrypt.sh",
     "ssl:renew": "docker compose exec certbot certbot renew && docker compose exec nginx nginx -s reload"
   },
