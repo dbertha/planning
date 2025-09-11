@@ -16,3 +16,20 @@ nginx*.conf
 init-letsencrypt.sh
 backup.sh
 MIGRATION_VPS.md
+
+# Certificats SSL et données Certbot (permissions sensibles)
+certbot/
+certbot/**
+letsencrypt/
+letsencrypt/**
+
+# Sauvegardes et logs
+backups/
+backups/**
+logs/
+logs/**
+
+# Fichiers temporaires et cache
+*.tmp
+.cache/
+.cache/**

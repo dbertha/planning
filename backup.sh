@@ -32,8 +32,8 @@ DB_PASS=$(echo "$DATABASE_URL" | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
 # Exporter le mot de passe pour pg_dump
 export PGPASSWORD="$DB_PASS"
 
-# Effectuer la sauvegarde
-if pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" --no-password | gzip > "$BACKUP_FILE"; then
+# Effectuer la sauvegarde via Docker (pg_dump depuis le conteneur PostgreSQL)
+if docker compose exec -T postgres pg_dump -U "$DB_USER" -d "$DB_NAME" | gzip > "$BACKUP_FILE"; then
     echo "[$(date -Iseconds)] ✅ Sauvegarde créée: $BACKUP_FILE"
     
     # Vérifier la taille du fichier
