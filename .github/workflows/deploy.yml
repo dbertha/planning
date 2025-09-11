@@ -19,6 +19,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug environment
+        run: |
+          echo "🔍 Informations sur l'environnement GitHub Actions:"
+          echo "📅 Date/Heure: $(date -Iseconds)"
+          echo "🏷️  Ref: ${{ github.ref }}"
+          echo "📝 SHA: ${{ github.sha }}"
+          echo "👤 Actor: ${{ github.actor }}"
+          echo "🔄 Event: ${{ github.event_name }}"
+          echo "📂 Workspace: ${{ github.workspace }}"
+          echo "🐧 Runner OS: ${{ runner.os }}"
+          echo ""
+          echo "📋 Fichiers dans le workspace:"
+          ls -la || true
+          echo ""
+          echo "🔍 Vérification des fichiers critiques:"
+          [ -f ".env.example" ] && echo "✅ .env.example trouvé" || echo "❌ .env.example manquant"
+          [ -f "scripts/deploy.sh" ] && echo "✅ scripts/deploy.sh trouvé" || echo "❌ scripts/deploy.sh manquant"
+
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -26,37 +44,76 @@ jobs:
 
       - name: Validate DEPLOY_SECRETS exists
         run: |
+          echo "🔍 Validation des secrets GitHub Actions..."
           if [ -z "${{ secrets.DEPLOY_SECRETS }}" ]; then
-            echo "Error: DEPLOY_SECRETS secret is not set in repository secrets."
+            echo "❌ Error: DEPLOY_SECRETS secret is not set in repository secrets."
+            echo "📝 Please add the DEPLOY_SECRETS secret in GitHub repository settings."
             exit 1
           fi
+          echo "✅ DEPLOY_SECRETS secret found"
+          echo "📏 Secret length: $(echo '${{ secrets.DEPLOY_SECRETS }}' | wc -c) characters"
 
       - name: Decode deploy secrets into .env.tmp
         run: |
-          echo "${{ secrets.DEPLOY_SECRETS }}" | base64 --decode > $ENV_TMP
-          echo "Decoded DEPLOY_SECRETS -> $ENV_TMP"
-          echo "---- content (first 10 lines) ----"
+          echo "🔄 Décodage du secret DEPLOY_SECRETS..."
+          echo "📂 Création du fichier temporaire: $ENV_TMP"
+          
+          # Tentative de décodage avec gestion d'erreur améliorée
+          if echo "${{ secrets.DEPLOY_SECRETS }}" | base64 --decode > $ENV_TMP 2>&1; then
+            echo "✅ Décodage base64 réussi"
+            echo "📄 Fichier créé: $ENV_TMP"
+            echo "📏 Taille du fichier décodé: $(wc -c < $ENV_TMP) bytes"
+            echo "📝 Nombre de lignes: $(wc -l < $ENV_TMP)"
+          else
+            echo "❌ Erreur lors du décodage base64"
+            echo "🔍 Vérification du format du secret..."
+            echo "📏 Longueur du secret brut: $(echo '${{ secrets.DEPLOY_SECRETS }}' | wc -c)"
+            echo "🔤 Premiers caractères: $(echo '${{ secrets.DEPLOY_SECRETS }}' | head -c 50)..."
+            exit 1
+          fi
+          
+          echo "---- Contenu décodé (10 premières lignes) ----"
           head -n 10 $ENV_TMP || true
+          echo "---- Fin de l'aperçu ----"
 
       - name: Check .env.example keys exist in decoded secrets
         id: checkkeys
         run: |
           set -e
+          echo "🔍 Vérification des clés requises..."
+          
           # read keys from .env.example (ignore comments & empty lines)
           KEYS=$(grep -v '^\s*#' .env.example | grep -v '^\s*$' | cut -d'=' -f1 | tr -d '\r')
+          TOTAL_KEYS=$(echo "$KEYS" | wc -w)
+          echo "📋 Clés requises trouvées dans .env.example: $TOTAL_KEYS"
+          echo "📝 Liste des clés: $(echo $KEYS | tr ' ' ',')"
+          
           MISSING=0
+          MISSING_KEYS=""
+          FOUND_KEYS=""
+          
           for key in $KEYS; do
             # check whether key is present in decoded .env
-            if ! grep -q -E "^${key}=" $ENV_TMP; then
-              echo "Missing secret for key: $key"
+            if grep -q -E "^${key}=" $ENV_TMP; then
+              FOUND_KEYS="$FOUND_KEYS $key"
+              echo "✅ $key: présent"
+            else
+              echo "❌ $key: MANQUANT"
+              MISSING_KEYS="$MISSING_KEYS $key"
               MISSING=1
             fi
           done
+          
+          echo ""
+          echo "📊 Résumé de la vérification:"
+          echo "✅ Clés trouvées: $(echo $FOUND_KEYS | wc -w)/$TOTAL_KEYS"
           if [ "$MISSING" -eq 1 ]; then
+            echo "❌ Clés manquantes: $(echo $MISSING_KEYS | wc -w)"
+            echo "🔍 Clés manquantes: $(echo $MISSING_KEYS | tr ' ' ',')"
             echo "::error ::One or more required secrets are missing in DEPLOY_SECRETS. Aborting deployment."
             exit 1
           fi
-          echo "All keys present."
+          echo "🎉 Toutes les clés requises sont présentes!"
 
       - name: Copy .env to server and deploy
         env:
@@ -64,28 +121,54 @@ jobs:
           SERVER_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
           REMOTE_APP_DIR: /srv/ecole-app
         run: |
+          echo "🚀 Début du déploiement sur le serveur..."
+          
           # sanity checks
+          echo "🔍 Vérification des paramètres de connexion SSH..."
           if [ -z "$SERVER_USER" ] || [ -z "$SERVER_HOST" ]; then
-            echo "SERVER_USER or SERVER_HOST secrets not set. Please set DEPLOY_SSH_USER and DEPLOY_SSH_HOST."
+            echo "❌ SERVER_USER or SERVER_HOST secrets not set."
+            echo "📝 Please set DEPLOY_SSH_USER and DEPLOY_SSH_HOST in repository secrets."
+            exit 2
+          fi
+          
+          echo "✅ Paramètres SSH validés:"
+          echo "👤 USER: $SERVER_USER"
+          echo "🖥️  HOST: $SERVER_HOST"
+          echo "📁 REMOTE_DIR: $REMOTE_APP_DIR"
+          
+          # copy .env
+          echo "📤 Copie du fichier .env vers le serveur..."
+          if scp -o StrictHostKeyChecking=no -v $ENV_TMP ${SERVER_USER}@${SERVER_HOST}:${REMOTE_APP_DIR}/.env; then
+            echo "✅ Fichier .env copié avec succès"
+          else
+            echo "❌ Échec de la copie du fichier .env"
             exit 2
           fi
 
-          # copy .env
-          scp -o StrictHostKeyChecking=no $ENV_TMP ${SERVER_USER}@${SERVER_HOST}:${REMOTE_APP_DIR}/.env
-
           # run deployment script on server (executes as $SERVER_USER)
+          echo "🔧 Exécution du script de déploiement sur le serveur..."
           ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} bash -lc "
             set -euo pipefail
+            echo '📍 Connexion SSH établie sur le serveur'
+            echo '📁 Navigation vers le répertoire: ${REMOTE_APP_DIR}'
             cd ${REMOTE_APP_DIR}
-            # Pull latest code (defensive)
+            
+            echo '📥 Mise à jour du code depuis Git...'
             git fetch --all --prune
             git reset --hard origin/main
-            # Give scripts/ deploy script permissions (in case)
+            echo '✅ Code mis à jour'
+            
+            echo '🔍 Vérification du script de déploiement...'
             if [ -f scripts/deploy.sh ]; then
+              echo '✅ Script scripts/deploy.sh trouvé'
               chmod +x scripts/deploy.sh
+              echo '🚀 Lancement du déploiement...'
               ./scripts/deploy.sh
+              echo '🎉 Déploiement terminé avec succès!'
             else
-              echo 'scripts/deploy.sh not found in repo. Please add it.'
+              echo '❌ scripts/deploy.sh not found in repo. Please add it.'
               exit 3
             fi
           "
+          
+          echo "🎉 Déploiement terminé avec succès!"
