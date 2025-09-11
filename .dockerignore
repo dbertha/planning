@@ -1,0 +1,18 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+*.log
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+# tests/ # Inclus pour les tests Docker
+coverage/
+dist/
+docker-compose*.yml
+nginx*.conf
+init-letsencrypt.sh
+backup.sh
+MIGRATION_VPS.md

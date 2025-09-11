@@ -1,0 +1,91 @@
+name: Deploy to OVH VPS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Nom du fichier .env temporaire créé pendant le job
+      ENV_TMP: .env.tmp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Validate DEPLOY_SECRETS exists
+        run: |
+          if [ -z "${{ secrets.DEPLOY_SECRETS }}" ]; then
+            echo "Error: DEPLOY_SECRETS secret is not set in repository secrets."
+            exit 1
+          fi
+
+      - name: Decode deploy secrets into .env.tmp
+        run: |
+          echo "${{ secrets.DEPLOY_SECRETS }}" | base64 --decode > $ENV_TMP
+          echo "Decoded DEPLOY_SECRETS -> $ENV_TMP"
+          echo "---- content (first 10 lines) ----"
+          head -n 10 $ENV_TMP || true
+
+      - name: Check .env.example keys exist in decoded secrets
+        id: checkkeys
+        run: |
+          set -e
+          # read keys from .env.example (ignore comments & empty lines)
+          KEYS=$(grep -v '^\s*#' .env.example | grep -v '^\s*$' | cut -d'=' -f1 | tr -d '\r')
+          MISSING=0
+          for key in $KEYS; do
+            # check whether key is present in decoded .env
+            if ! grep -q -E "^${key}=" $ENV_TMP; then
+              echo "Missing secret for key: $key"
+              MISSING=1
+            fi
+          done
+          if [ "$MISSING" -eq 1 ]; then
+            echo "::error ::One or more required secrets are missing in DEPLOY_SECRETS. Aborting deployment."
+            exit 1
+          fi
+          echo "All keys present."
+
+      - name: Copy .env to server and deploy
+        env:
+          SERVER_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          SERVER_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          REMOTE_APP_DIR: /srv/ecole-app
+        run: |
+          # sanity checks
+          if [ -z "$SERVER_USER" ] || [ -z "$SERVER_HOST" ]; then
+            echo "SERVER_USER or SERVER_HOST secrets not set. Please set DEPLOY_SSH_USER and DEPLOY_SSH_HOST."
+            exit 2
+          fi
+
+          # copy .env
+          scp -o StrictHostKeyChecking=no $ENV_TMP ${SERVER_USER}@${SERVER_HOST}:${REMOTE_APP_DIR}/.env
+
+          # run deployment script on server (executes as $SERVER_USER)
+          ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${SERVER_HOST} bash -lc "
+            set -euo pipefail
+            cd ${REMOTE_APP_DIR}
+            # Pull latest code (defensive)
+            git fetch --all --prune
+            git reset --hard origin/main
+            # Give scripts/ deploy script permissions (in case)
+            if [ -f scripts/deploy.sh ]; then
+              chmod +x scripts/deploy.sh
+              ./scripts/deploy.sh
+            else
+              echo 'scripts/deploy.sh not found in repo. Please add it.'
+              exit 3
+            fi
+          "
