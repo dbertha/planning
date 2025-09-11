@@ -1,0 +1,22 @@
+# cron/cronjobs.yml
+# Exemple de jobs cron versionnés.
+# Chaque job : name, schedule (cron expr or @daily/@hourly...), command (script dans repo),
+# user (optionnel, si different de l'utilisateur SSH), comment (optionnel).
+
+jobs:
+  - name: nightly-db-backup
+    schedule: "0 2 * * *"            # tous les jours à 02:00 (UTC)
+    command: "/srv/ecole-app/backup.sh"
+    comment: "Backup quotidien de la base (gzip)"
+  - name: cleanup-backups
+    schedule: "30 3 * * 0"           # dimanche 03:30
+    command: "/usr/bin/find /srv/ecole-app/backups -type f -mtime +30 -delete"
+    comment: "Supprime les backups anciens de plus de 30 jours"
+  - name: health-ping
+    schedule: "*/10 * * * *"         # chaque 10 minutes
+    command: "/srv/ecole-app/scripts/ping-health.sh"
+    comment: "Ping health endpoint pour monitoring"
+  - name: ssl-renewal-check
+    schedule: "0 12 * * *"           # tous les jours à midi
+    command: "cd /srv/ecole-app && docker compose exec -T certbot certbot renew --quiet && docker compose exec -T nginx nginx -s reload"
+    comment: "Vérification et renouvellement automatique des certificats SSL"
