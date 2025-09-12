@@ -8,6 +8,7 @@ import authHandler from './api/auth.js';
 import planningHandler from './api/planning.js';
 import famillesHandler from './api/familles.js';
 import smsHandler from './api/sms.js';
+import smsCronHandler from './api/sms-cron.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,6 +81,18 @@ app.use('/api/sms', async (req, res, next) => {
   }
 });
 
+app.use('/api/sms-cron', async (req, res, next) => {
+  console.log('⏰ SMS CRON endpoint appelé');
+  try {
+    await smsCronHandler(req, res);
+  } catch (err) {
+    console.error('❌ Erreur SMS CRON détaillée:', err.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erreur serveur SMS CRON' });
+    }
+  }
+});
+
 // Route de santé
 app.get('/health', (req, res) => {
   console.log('✅ Health check');
@@ -126,7 +139,7 @@ if (process.env.NODE_ENV === 'production') {
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Planning API Server (Production)', 
-    endpoints: ['/api/auth', '/api/planning', '/api/familles', '/api/sms', '/health']
+    endpoints: ['/api/auth', '/api/planning', '/api/familles', '/api/sms', '/api/sms-cron', '/health']
   });
 });
 
@@ -153,6 +166,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   • http://localhost:${PORT}/api/planning`);
   console.log(`   • http://localhost:${PORT}/api/familles`);
   console.log(`   • http://localhost:${PORT}/api/sms`);
+  console.log(`   • http://localhost:${PORT}/api/sms-cron`);
   console.log(`📋 Variables d'environnement:`);
   console.log(`   • DATABASE_URL: ${process.env.DATABASE_URL ? '✅ SET' : '❌ NOT SET'}`);
   console.log(`   • NODE_ENV: ${process.env.NODE_ENV || 'production'}`);
