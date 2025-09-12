@@ -28,7 +28,7 @@ export const famillesQueries = {
   },
   
   getById: (familleId, planningId) => 
-    query('SELECT * FROM familles WHERE id = $1 AND planning_id = $2', [familleId, planningId]),
+    query('SELECT * FROM familles WHERE id = $1 AND planning_id = $2 AND is_active = true', [familleId, planningId]),
   
   getByIds: (familleIds, planningId) => {
     const placeholders = familleIds.map((_, i) => `$${i + 2}`).join(',');
@@ -39,7 +39,7 @@ export const famillesQueries = {
   },
 
   getPreferences: (familleId, planningId) => 
-    query('SELECT classes_preferences FROM familles WHERE id = $1 AND planning_id = $2', [familleId, planningId]),
+    query('SELECT classes_preferences FROM familles WHERE id = $1 AND planning_id = $2 AND is_active = true', [familleId, planningId]),
 };
 
 /**
