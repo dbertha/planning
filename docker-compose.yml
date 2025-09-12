@@ -25,6 +25,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    # Commande pour s'assurer que les fichiers statiques sont copiés au démarrage
+    command: >
+      sh -c "
+        echo 'Copie des fichiers statiques vers le volume partagé...' &&
+        cp -r /app/dist/. /usr/share/nginx/html/ 2>/dev/null || echo 'Volume nginx pas encore disponible' &&
+        echo 'Démarrage du serveur...' &&
+        node prod-server.js
+      "
 
   postgres:
     image: postgres:15-alpine
