@@ -163,10 +163,16 @@ export const initDatabase = async () => {
         fin DATE NOT NULL,
         type VARCHAR(10) NOT NULL,
         description TEXT,
+        code_cles TEXT, -- Codes clés pour cette semaine (ex: "Code A1, Code B2")
         is_published BOOLEAN DEFAULT false, -- Semaine publiée ou non
         published_at TIMESTAMP, -- Date de publication
         PRIMARY KEY (id, planning_id)
       );
+    `);
+
+    // Migration: Ajouter la colonne code_cles si elle n'existe pas
+    await query(`
+      ALTER TABLE semaines ADD COLUMN IF NOT EXISTS code_cles TEXT;
     `);
 
     // Table des affectations simplifiée (une famille max par cellule)
@@ -895,6 +901,22 @@ export const deleteScheduledSMS = async (smsId) => {
   }
 };
 
+export const updateScheduledSMSLastExecuted = async (smsId) => {
+  try {
+    const result = await query(`
+      UPDATE scheduled_sms 
+      SET last_executed_date = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [smsId]);
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('Erreur mise à jour last_executed_date:', error);
+    throw error;
+  }
+};
+
 export const getScheduledSMSToExecute = async () => {
   try {
     // Obtenir l'heure actuelle en fuseau horaire de Bruxelles
@@ -907,23 +929,87 @@ export const getScheduledSMSToExecute = async () => {
     
     console.log(`🕐 Vérification SMS planifiés - Heure Bruxelles: ${brusselsTime.toLocaleString('fr-BE')} (Jour: ${currentDayOfWeek}, H: ${currentHour}, M: ${currentMinute})`);
     
-    // Chercher les SMS à envoyer maintenant (avec une tolérance de 5 minutes pour les services externes)
-    const result = await query(`
+    // Fonction pour calculer la dernière occurrence d'une date/heure planifiée dans les dernières 24h
+    const getLastScheduledOccurrenceIn24h = (dayOfWeek, hour, minute) => {
+      const now = new Date(brusselsTime);
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      // Chercher dans les dernières 24h seulement
+      for (let daysBack = 0; daysBack <= 1; daysBack++) {
+        const checkDate = new Date(now);
+        checkDate.setDate(now.getDate() - daysBack);
+        
+        if (checkDate.getDay() === dayOfWeek) {
+          // C'est le bon jour de la semaine
+          checkDate.setHours(hour, minute, 0, 0);
+          
+          // Si cette occurrence est dans les dernières 24h ET avant maintenant
+          if (checkDate >= twentyFourHoursAgo && checkDate < now) {
+            return checkDate;
+          }
+        }
+      }
+      
+      return null; // Aucune occurrence trouvée dans les dernières 24h
+    };
+    
+    // Récupérer tous les SMS actifs
+    const allSMS = await query(`
       SELECT s.*, p.name as planning_name, p.token as planning_token
       FROM scheduled_sms s
       JOIN plannings p ON s.planning_id = p.id
-      WHERE s.is_active = true 
-        AND s.day_of_week = $1 
-        AND s.hour = $2 
-        AND s.minute BETWEEN $3 AND $4
-        AND p.is_active = true
-    `, [currentDayOfWeek, currentHour, Math.max(0, currentMinute - 5), currentMinute]);
+      WHERE s.is_active = true AND p.is_active = true
+      ORDER BY s.day_of_week, s.hour, s.minute
+    `);
     
-    if (result.rows.length > 0) {
-      console.log(`📱 ${result.rows.length} SMS planifié(s) à exécuter trouvé(s)`);
+    const smsToExecute = [];
+    
+    for (const sms of allSMS.rows) {
+      // Vérifier si le SMS est programmé maintenant (avec tolérance de 5 minutes)
+      const isScheduledNow = (
+        sms.day_of_week === currentDayOfWeek && 
+        sms.hour === currentHour && 
+        sms.minute >= Math.max(0, currentMinute - 5) && 
+        sms.minute <= currentMinute
+      );
+      
+      if (isScheduledNow) {
+        smsToExecute.push(sms);
+        console.log(`   • "${sms.name}" - programmé maintenant`);
+        continue;
+      }
+      
+      // Pour les SMS non programmés maintenant, vérifier s'ils auraient dû s'exécuter dans les dernières 24h
+      const lastScheduledOccurrence = getLastScheduledOccurrenceIn24h(sms.day_of_week, sms.hour, sms.minute);
+      
+      if (!lastScheduledOccurrence) {
+        continue; // Aucune occurrence dans les dernières 24h
+      }
+      
+      // Vérifier si le SMS doit être envoyé :
+      // 1. Jamais envoyé (last_executed_date IS NULL)
+      // 2. Dernière exécution antérieure à la dernière occurrence planifiée
+      const shouldExecute = (
+        !sms.last_executed_date || 
+        new Date(sms.last_executed_date) < lastScheduledOccurrence
+      );
+      
+      if (shouldExecute) {
+        smsToExecute.push(sms);
+        
+        if (!sms.last_executed_date) {
+          console.log(`   • "${sms.name}" - jamais envoyé (dernière occurrence: ${lastScheduledOccurrence.toLocaleString('fr-BE')})`);
+        } else {
+          console.log(`   • "${sms.name}" - en retard (dernière exécution: ${new Date(sms.last_executed_date).toLocaleString('fr-BE')}, dernière occurrence: ${lastScheduledOccurrence.toLocaleString('fr-BE')})`);
+        }
+      }
     }
     
-    return result.rows;
+    if (smsToExecute.length > 0) {
+      console.log(`📱 ${smsToExecute.length} SMS planifié(s) à exécuter trouvé(s)`);
+    }
+    
+    return smsToExecute;
   } catch (error) {
     console.error('Erreur récupération SMS à exécuter:', error);
     throw error;
