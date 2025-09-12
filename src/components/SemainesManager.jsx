@@ -11,6 +11,8 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, semaineId: null, semaineName: null });
   const [editCodesModal, setEditCodesModal] = useState({ isOpen: false, semaine: null });
   const [editCodes, setEditCodes] = useState('');
+  const [inlineEditingCodes, setInlineEditingCodes] = useState(null); // ID de la semaine en cours d'édition inline
+  const [inlineEditCodesValue, setInlineEditCodesValue] = useState('');
   const [editModal, setEditModal] = useState({ isOpen: false, semaine: null });
   const [editFormData, setEditFormData] = useState({
     debut: '',
@@ -179,6 +181,48 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
   const handleEditCodes = (semaine) => {
     setEditCodesModal({ isOpen: true, semaine });
     setEditCodes(semaine.code_cles || '');
+  };
+
+  const handleInlineEditCodes = (semaine) => {
+    setInlineEditingCodes(semaine.id);
+    setInlineEditCodesValue(semaine.code_cles || '');
+  };
+
+  const handleSaveInlineCodes = async (semaineId) => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/planning', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          type: 'semaine',
+          id: semaineId,
+          data: { code_cles: inlineEditCodesValue }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la mise à jour');
+      }
+
+      setInlineEditingCodes(null);
+      setInlineEditCodesValue('');
+      await loadSemaines();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelInlineCodes = () => {
+    setInlineEditingCodes(null);
+    setInlineEditCodesValue('');
   };
 
   const saveCodes = async () => {
@@ -552,10 +596,10 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                 type="text"
                 value={newSemaine.code_cles}
                 onChange={(e) => setNewSemaine({ ...newSemaine, code_cles: e.target.value })}
-                placeholder="Code A1, Code B2, etc. (séparés par des virgules)"
+                placeholder="1234, 5678, 9012 (codes à 4 chiffres séparés par des virgules)"
               />
               <small style={{ color: '#666', fontSize: '0.8rem' }}>
-                Ces codes seront disponibles dans les SMS planifiés via la variable {'{codes_cles}'}
+                Codes de boîtes à clés (4 chiffres). Disponibles dans les SMS via {'{codes_cles}'}
               </small>
             </div>
 
@@ -622,11 +666,58 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                   </div>
                 )}
 
-                {semaine.code_cles && (
-                  <div className="semaine-codes">
-                    <strong>Codes clés:</strong> {semaine.code_cles}
-                  </div>
-                )}
+                {/* Codes clés - affichage inline ou édition */}
+                <div className="semaine-codes-section">
+                  {inlineEditingCodes === semaine.id ? (
+                    <div className="inline-codes-edit">
+                      <label>Codes clés:</label>
+                      <div className="inline-codes-input">
+                        <input
+                          type="text"
+                          value={inlineEditCodesValue}
+                          onChange={(e) => setInlineEditCodesValue(e.target.value)}
+                          placeholder="1234, 5678, 9012"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveInlineCodes(semaine.id);
+                            } else if (e.key === 'Escape') {
+                              handleCancelInlineCodes();
+                            }
+                          }}
+                          autoFocus
+                        />
+                        <div className="inline-codes-actions">
+                          <button
+                            onClick={() => handleSaveInlineCodes(semaine.id)}
+                            className="btn-save-inline"
+                            disabled={loading}
+                            title="Sauvegarder (Entrée)"
+                          >
+                            ✅
+                          </button>
+                          <button
+                            onClick={handleCancelInlineCodes}
+                            className="btn-cancel-inline"
+                            title="Annuler (Échap)"
+                          >
+                            ❌
+                          </button>
+                        </div>
+                      </div>
+                      <small className="inline-codes-help">
+                        Entrée pour sauvegarder, Échap pour annuler
+                      </small>
+                    </div>
+                  ) : (
+                    <div className="semaine-codes" onClick={() => handleInlineEditCodes(semaine)}>
+                      <strong>Codes clés:</strong> 
+                      <span className="codes-value">
+                        {semaine.code_cles || 'Cliquez pour ajouter'}
+                      </span>
+                      <span className="edit-hint">✏️</span>
+                    </div>
+                  )}
+                </div>
 
                 {semaine.published_at && (
                   <div className="published-at">
@@ -642,14 +733,6 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                     title="Modifier la semaine"
                   >
                     ✏️ Éditer
-                  </button>
-                  <button
-                    onClick={() => handleEditCodes(semaine)}
-                    className="btn btn-outline"
-                    disabled={loading}
-                    title="Modifier les codes clés"
-                  >
-                    🔑 Codes
                   </button>
                   <button
                     onClick={() => handleTogglePublication(semaine.id, semaine.is_published)}
@@ -704,11 +787,11 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                   type="text"
                   value={editCodes}
                   onChange={(e) => setEditCodes(e.target.value)}
-                  placeholder="Code A1, Code B2, etc. (séparés par des virgules)"
+                  placeholder="1234, 5678, 9012 (codes à 4 chiffres séparés par des virgules)"
                   style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
                 />
                 <small style={{ color: '#666', fontSize: '0.8rem', marginTop: '0.5rem', display: 'block' }}>
-                  Ces codes seront disponibles dans les SMS planifiés via la variable {'{codes_cles}'}
+                  Codes de boîtes à clés (4 chiffres). Disponibles dans les SMS via {'{codes_cles}'}
                 </small>
               </div>
             </div>
@@ -806,10 +889,10 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                   type="text"
                   value={editFormData.code_cles}
                   onChange={(e) => setEditFormData({ ...editFormData, code_cles: e.target.value })}
-                  placeholder="Code A1, Code B2, etc. (séparés par des virgules)"
+                  placeholder="1234, 5678, 9012 (codes à 4 chiffres séparés par des virgules)"
                 />
                 <small style={{ color: '#666', fontSize: '0.8rem' }}>
-                  Ces codes seront disponibles dans les SMS planifiés via la variable {'{codes_cles}'}
+                  Codes de boîtes à clés (4 chiffres). Disponibles dans les SMS via {'{codes_cles}'}
                 </small>
               </div>
             </div>
@@ -1033,14 +1116,106 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
           font-style: italic;
         }
 
+        .semaine-codes-section {
+          margin-bottom: 8px;
+        }
+
         .semaine-codes {
           font-size: 12px;
           color: #007bff;
-          margin-bottom: 8px;
           background: #f8f9fa;
-          padding: 4px 8px;
+          padding: 6px 8px;
           border-radius: 4px;
           border-left: 3px solid #007bff;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .semaine-codes:hover {
+          background: #e9ecef;
+        }
+
+        .codes-value {
+          flex: 1;
+          color: #333;
+        }
+
+        .codes-value:empty::before {
+          content: "Cliquez pour ajouter";
+          color: #999;
+          font-style: italic;
+        }
+
+        .edit-hint {
+          font-size: 10px;
+          opacity: 0.7;
+        }
+
+        .inline-codes-edit {
+          background: #f8f9fa;
+          padding: 8px;
+          border-radius: 4px;
+          border-left: 3px solid #007bff;
+        }
+
+        .inline-codes-edit label {
+          display: block;
+          margin-bottom: 4px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #333;
+        }
+
+        .inline-codes-input {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 4px;
+        }
+
+        .inline-codes-input input {
+          flex: 1;
+          padding: 4px 6px;
+          border: 1px solid #ddd;
+          border-radius: 3px;
+          font-size: 12px;
+        }
+
+        .inline-codes-input input:focus {
+          outline: none;
+          border-color: #007bff;
+        }
+
+        .inline-codes-actions {
+          display: flex;
+          gap: 4px;
+        }
+
+        .btn-save-inline, .btn-cancel-inline {
+          background: none;
+          border: none;
+          padding: 2px 4px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 12px;
+          transition: background-color 0.2s;
+        }
+
+        .btn-save-inline:hover {
+          background: #d4edda;
+        }
+
+        .btn-cancel-inline:hover {
+          background: #f8d7da;
+        }
+
+        .inline-codes-help {
+          font-size: 10px;
+          color: #666;
+          font-style: italic;
         }
 
         .published-at {

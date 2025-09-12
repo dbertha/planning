@@ -93,20 +93,45 @@ const FAMILLES_EXCLUES = [
 ];
 
 /**
- * Parse CSV content into array of objects
+ * Parse CSV content into array of objects with proper quote handling
  */
 function parseCSV(csvContent, delimiter = ';') {
-  const lines = csvContent.trim().split('\n');
-  const headers = lines[0].split(delimiter);
+  const lines = csvContent.trim().split(/\r?\n/); // Gérer les retours chariot Windows
+  const headers = parseCSVLine(lines[0], delimiter);
   
   return lines.slice(1).map(line => {
-    const values = line.split(delimiter);
+    const values = parseCSVLine(line, delimiter);
     const obj = {};
     headers.forEach((header, index) => {
       obj[header.trim()] = values[index]?.trim() || '';
     });
     return obj;
   });
+}
+
+/**
+ * Parse a single CSV line handling quoted values properly
+ */
+function parseCSVLine(line, delimiter = ',') {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === delimiter && !inQuotes) {
+      values.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  values.push(current); // Add the last value
+  return values;
 }
 
 /**
@@ -166,53 +191,105 @@ function generateFamillesCSV() {
   const elevesContent = fs.readFileSync('Coordonnées élèves 2025-2026.csv', 'utf-8');
   const famillesContent = fs.readFileSync('Coordonnées élèves 2025-2026_familles.csv', 'utf-8');
   
-  const eleves = parseCSV(elevesContent);
-  const famillesData = parseCSV(famillesContent);
+  const eleves = parseCSV(elevesContent, ',');
+  const famillesData = parseCSV(famillesContent, ','); // Utiliser virgule pour le fichier familles
   
-  // Créer un mapping famille_id -> données famille
+  // Créer un mapping nom_famille -> données famille (avec gestion des doublons)
   const famillesMap = new Map();
+  const famillesDuplicates = new Map(); // Pour stocker les familles en doublon
+  
   famillesData.forEach(famille => {
-    if (famille['Num famille']) {
-      famillesMap.set(famille['Num famille'], famille);
+    const nomFamille = famille['Nom Elève'];
+    if (nomFamille) {
+      if (famillesMap.has(nomFamille)) {
+        // Doublon détecté, stocker dans la map des duplicates
+        if (!famillesDuplicates.has(nomFamille)) {
+          famillesDuplicates.set(nomFamille, [famillesMap.get(nomFamille)]);
+        }
+        famillesDuplicates.get(nomFamille).push(famille);
+      } else {
+        famillesMap.set(nomFamille, famille);
+      }
     }
   });
   
-  // Grouper les élèves par famille et collecter les préférences de classes
+  // Grouper les élèves par nom de famille et collecter les préférences de classes
   const famillesPreferences = new Map();
   
   eleves.forEach(eleve => {
-    const numFamille = eleve['Num famille'];
+    const nomEleve = eleve['Nom Elève'];
     const titulaire = eleve['Titulaire'];
     
-    if (!numFamille || !titulaire) return;
+    if (!nomEleve || !titulaire) return;
     
     // Mapper titulaire vers zone
     const zoneId = TITULAIRE_TO_ZONE[titulaire];
     if (!zoneId) {
-      console.warn(`Titulaire non mappé: ${titulaire} pour élève ${eleve['Nom Elève']}`);
+      console.warn(`Titulaire non mappé: ${titulaire} pour élève ${nomEleve}`);
       return;
     }
     
-    if (!famillesPreferences.has(numFamille)) {
-      famillesPreferences.set(numFamille, new Set());
+    if (!famillesPreferences.has(nomEleve)) {
+      famillesPreferences.set(nomEleve, new Set());
     }
     
-    famillesPreferences.get(numFamille).add(zoneId);
+    famillesPreferences.get(nomEleve).add(zoneId);
   });
   
   // Générer les données familles pour CSV
   const headers = ['nom', 'email', 'telephone', 'telephone2', 'nb_nettoyage', 'classes_preferences', 'notes'];
   const csvLines = [headers.join(',')];
   
-  famillesPreferences.forEach((zones, numFamille) => {
-    const familleData = famillesMap.get(numFamille);
-    if (!familleData) {
-      console.warn(`Données famille manquantes pour numéro: ${numFamille}`);
-      return;
+  // Traiter les familles normales (sans doublon)
+  famillesPreferences.forEach((zones, nomEleve) => {
+    if (!famillesDuplicates.has(nomEleve)) {
+      const familleData = famillesMap.get(nomEleve);
+      if (!familleData) {
+        console.warn(`Données famille manquantes pour: ${nomEleve}`);
+        return;
+      }
+      
+      processFamille(familleData, nomEleve, zones, nomEleve);
     }
-    
-    // Extraire nom famille principal (premier nom d'enfant)
-    const nomFamille = familleData['Nom Elève'] || '';
+  });
+  
+  // Traiter les familles en doublon
+  famillesDuplicates.forEach((duplicates, nomFamille) => {
+    duplicates.forEach((familleData, index) => {
+      // Trouver les élèves correspondant à cette famille spécifique
+      let elevesDeFamily = eleves.filter(e => {
+        return e['Nom Elève'] === nomFamille && 
+               (e['GSM Père'] === familleData['GSM Père'] ||
+                e['GSM Mère'] === familleData['GSM Mère']);
+      });
+      
+      if (elevesDeFamily.length === 0) {
+        // Fallback: utiliser tous les élèves de ce nom de famille
+        elevesDeFamily = eleves.filter(e => e['Nom Elève'] === nomFamille);
+      }
+      
+      const prenomsEleves = elevesDeFamily.map(e => e['Prénom élève']).sort().join(', ');
+      const nomFamilleOutput = `${nomFamille} (${prenomsEleves})`;
+      
+      // Collecter les zones pour cette famille spécifique
+      const zones = new Set();
+      elevesDeFamily.forEach(eleve => {
+        const titulaire = eleve['Titulaire'];
+        const zoneId = TITULAIRE_TO_ZONE[titulaire];
+        if (zoneId) {
+          zones.add(zoneId);
+        }
+      });
+      
+      if (zones.size > 0) {
+        processFamille(familleData, nomFamille, zones, nomFamilleOutput);
+      }
+    });
+  });
+  
+  // Fonction pour traiter une famille
+  function processFamille(familleData, nomEleve, zones, nomFamilleOutput = null) {
+    const nomFamille = nomFamilleOutput || familleData['Nom Elève'] || nomEleve;
     
     // Vérifier si famille exclue
     const isExcluded = FAMILLES_EXCLUES.some(excluded => 
@@ -265,7 +342,7 @@ function generateFamillesCSV() {
     ];
     
     csvLines.push(line.join(','));
-  });
+  }
   
   return csvLines.join('\n');
 }
