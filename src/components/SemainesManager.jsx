@@ -11,6 +11,15 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, semaineId: null, semaineName: null });
   const [editCodesModal, setEditCodesModal] = useState({ isOpen: false, semaine: null });
   const [editCodes, setEditCodes] = useState('');
+  const [editModal, setEditModal] = useState({ isOpen: false, semaine: null });
+  const [editFormData, setEditFormData] = useState({
+    debut: '',
+    fin: '',
+    type: '',
+    description: '',
+    code_cles: '',
+    is_published: false
+  });
 
   // Formulaire pour nouvelle semaine
   const [newSemaine, setNewSemaine] = useState({
@@ -199,6 +208,71 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
       setEditCodesModal({ isOpen: false, semaine: null });
       setEditCodes('');
       await loadSemaines();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditSemaine = (semaine) => {
+    setEditFormData({
+      debut: semaine.debut,
+      fin: semaine.fin,
+      type: semaine.type,
+      description: semaine.description || '',
+      code_cles: semaine.code_cles || '',
+      is_published: semaine.is_published
+    });
+    setEditModal({ isOpen: true, semaine });
+  };
+
+  const saveEditSemaine = async () => {
+    if (!editModal.semaine) return;
+
+    // Validation basique
+    if (!editFormData.debut || !editFormData.fin) {
+      setError('Les dates de début et fin sont obligatoires');
+      return;
+    }
+
+    if (new Date(editFormData.fin) <= new Date(editFormData.debut)) {
+      setError('La date de fin doit être après la date de début');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/planning', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          type: 'semaine',
+          id: editModal.semaine.id,
+          data: editFormData
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la mise à jour');
+      }
+
+      setEditModal({ isOpen: false, semaine: null });
+      setEditFormData({
+        debut: '',
+        fin: '',
+        type: '',
+        description: '',
+        code_cles: '',
+        is_published: false
+      });
+      await loadSemaines();
+      refreshPlanningGrid(); // Recharger la grille de planning
     } catch (err) {
       setError(err.message);
     } finally {
@@ -562,6 +636,14 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
 
                 <div className="semaine-actions">
                   <button
+                    onClick={() => handleEditSemaine(semaine)}
+                    className="btn btn-outline"
+                    disabled={loading}
+                    title="Modifier la semaine"
+                  >
+                    ✏️ Éditer
+                  </button>
+                  <button
                     onClick={() => handleEditCodes(semaine)}
                     className="btn btn-outline"
                     disabled={loading}
@@ -643,6 +725,107 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                 className="btn btn-primary"
               >
                 {loading ? 'Sauvegarde...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'édition complète de la semaine */}
+      {editModal.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal modal-large">
+            <div className="modal-header">
+              <h3>✏️ Éditer la semaine - {editModal.semaine?.id}</h3>
+              <button 
+                onClick={() => setEditModal({ isOpen: false, semaine: null })}
+                className="modal-close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date début *</label>
+                  <input
+                    type="date"
+                    value={editFormData.debut}
+                    onChange={(e) => setEditFormData({ ...editFormData, debut: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Date fin *</label>
+                  <input
+                    type="date"
+                    value={editFormData.fin}
+                    onChange={(e) => setEditFormData({ ...editFormData, fin: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Type</label>
+                  <select
+                    value={editFormData.type}
+                    onChange={(e) => setEditFormData({ ...editFormData, type: e.target.value })}
+                  >
+                    <option value="nettoyage">Nettoyage</option>
+                    <option value="vacances">Vacances</option>
+                    <option value="special">Spécial</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={editFormData.is_published}
+                      onChange={(e) => setEditFormData({ ...editFormData, is_published: e.target.checked })}
+                    />
+                    Publiée
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Description</label>
+                <input
+                  type="text"
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  placeholder="Description de la semaine..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Codes clés</label>
+                <input
+                  type="text"
+                  value={editFormData.code_cles}
+                  onChange={(e) => setEditFormData({ ...editFormData, code_cles: e.target.value })}
+                  placeholder="Code A1, Code B2, etc. (séparés par des virgules)"
+                />
+                <small style={{ color: '#666', fontSize: '0.8rem' }}>
+                  Ces codes seront disponibles dans les SMS planifiés via la variable {'{codes_cles}'}
+                </small>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                onClick={() => setEditModal({ isOpen: false, semaine: null })}
+                className="btn btn-secondary"
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={saveEditSemaine}
+                disabled={loading}
+                className="btn btn-primary"
+              >
+                {loading ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
               </button>
             </div>
           </div>
@@ -941,6 +1124,84 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
           text-align: center;
           color: #666;
           padding: 20px;
+        }
+
+        /* Styles pour les modals */
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .modal {
+          background: white;
+          border-radius: 8px;
+          width: 90%;
+          max-width: 500px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-large {
+          max-width: 700px;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid #eee;
+          background: #f8f9fa;
+          border-radius: 8px 8px 0 0;
+        }
+
+        .modal-header h3 {
+          margin: 0;
+          color: #333;
+          font-size: 18px;
+        }
+
+        .modal-close {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          color: #999;
+          padding: 0;
+          width: 30px;
+          height: 30px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+        }
+
+        .modal-close:hover {
+          background: #f0f0f0;
+          color: #333;
+        }
+
+        .modal-body {
+          padding: 20px;
+        }
+
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          padding: 16px 20px;
+          border-top: 1px solid #eee;
+          background: #f8f9fa;
+          border-radius: 0 0 8px 8px;
         }
       `}</style>
     </div>

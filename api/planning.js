@@ -424,9 +424,46 @@ async function handlePut(req, res) {
         break;
 
       case 'semaine':
+        // Construire la requête de mise à jour dynamiquement selon les champs fournis
+        const updateFields = [];
+        const updateValues = [];
+        let paramIndex = 1;
+
+        if (data.debut !== undefined) {
+          updateFields.push(`debut = $${paramIndex++}`);
+          updateValues.push(data.debut);
+        }
+        if (data.fin !== undefined) {
+          updateFields.push(`fin = $${paramIndex++}`);
+          updateValues.push(data.fin);
+        }
+        if (data.type !== undefined) {
+          updateFields.push(`type = $${paramIndex++}`);
+          updateValues.push(data.type);
+        }
+        if (data.description !== undefined) {
+          updateFields.push(`description = $${paramIndex++}`);
+          updateValues.push(data.description);
+        }
+        if (data.code_cles !== undefined) {
+          updateFields.push(`code_cles = $${paramIndex++}`);
+          updateValues.push(data.code_cles);
+        }
+        if (data.is_published !== undefined) {
+          updateFields.push(`is_published = $${paramIndex++}`);
+          updateValues.push(data.is_published);
+        }
+
+        if (updateFields.length === 0) {
+          return res.status(400).json({ error: 'Aucune donnée à mettre à jour' });
+        }
+
+        // Ajouter les paramètres pour WHERE
+        updateValues.push(id, planning.id);
+
         const semaineResult = await query(
-          'UPDATE semaines SET debut = $1, fin = $2, type = $3, description = $4, is_published = $5 WHERE id = $6 AND planning_id = $7 RETURNING *',
-          [data.debut, data.fin, data.type, data.description, data.is_published, id, planning.id]
+          `UPDATE semaines SET ${updateFields.join(', ')} WHERE id = $${paramIndex++} AND planning_id = $${paramIndex++} RETURNING *`,
+          updateValues
         );
         if (semaineResult.rows.length === 0) {
           return res.status(404).json({ error: 'Semaine non trouvée' });
