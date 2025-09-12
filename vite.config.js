@@ -6,6 +6,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // Ajouter un timestamp pour forcer le rechargement
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`,
         manualChunks: {
           // Séparer React et ReactDOM
           'react-vendor': ['react', 'react-dom'],
