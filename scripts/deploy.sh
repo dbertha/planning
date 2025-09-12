@@ -58,6 +58,7 @@ if docker compose exec -T "$APP_SERVICE_NAME" ls -la /app/dist/ >/dev/null 2>&1;
     
     # Forcer la copie des fichiers statiques
     echo "[$(date -Iseconds)] Copie forcée des fichiers statiques vers nginx" | tee -a "$LOGFILE"
+    docker compose exec -T nginx mkdir -p /usr/share/nginx/html/assets || echo "Création du répertoire échouée" | tee -a "$LOGFILE"
     docker compose exec -T "$APP_SERVICE_NAME" cp -r /app/dist/. /usr/share/nginx/html/ || echo "Copie échouée, mais on continue" | tee -a "$LOGFILE"
     
     # Vérifier le volume partagé après copie
@@ -80,6 +81,7 @@ CURRENT_TIME=$(date +%s)
 OLD_FILES=$(docker compose exec -T nginx find /usr/share/nginx/html -name "*.js" -o -name "*.css" -mmin +5 2>/dev/null | wc -l)
 if [ "$OLD_FILES" -gt 0 ]; then
     echo "[$(date -Iseconds)] ⚠️ $OLD_FILES fichiers statiques sont anciens, forçage de la copie..." | tee -a "$LOGFILE"
+    docker compose exec -T nginx mkdir -p /usr/share/nginx/html/assets || echo "Création du répertoire échouée" | tee -a "$LOGFILE"
     docker compose exec -T "$APP_SERVICE_NAME" cp -r /app/dist/. /usr/share/nginx/html/ || echo "Copie forcée échouée" | tee -a "$LOGFILE"
 else
     echo "[$(date -Iseconds)] ✅ Fichiers statiques récents détectés" | tee -a "$LOGFILE"
