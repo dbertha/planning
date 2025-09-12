@@ -199,6 +199,7 @@ async function runTests() {
           fin: '2024-02-07',
           type: 'nettoyage',
           description: 'Semaine de test',
+          code_cles: 'Code A1, Code B2',
           is_published: false
         }
       })
@@ -207,6 +208,7 @@ async function runTests() {
     assertEqual(status, 201, 'Status devrait être 201');
     assertEqual(data.id, testSemaineId, 'ID semaine devrait correspondre');
     assertEqual(data.is_published, false, 'Semaine ne devrait pas être publiée');
+    assertEqual(data.code_cles, 'Code A1, Code B2', 'Codes clés devraient être sauvegardés');
   });
 
   // Test 7: Création d'une famille
@@ -286,7 +288,28 @@ async function runTests() {
     assertEqual(status, 400, 'Status devrait être 400 (conflit)');
   });
 
-  // Test 9: Publication d'une semaine
+  // Test 9: Mise à jour des codes clés d'une semaine
+  await runner.test('Mise à jour des codes clés d\'une semaine', async () => {
+    const { data, status } = await apiCall('/api/planning', {
+      method: 'PUT',
+      headers: {
+        'X-Admin-Session': testAdminSession
+      },
+      body: ({
+        token: testPlanningToken,
+        type: 'semaine',
+        id: testSemaineId,
+        data: {
+          code_cles: 'Code C3, Code D4, Code E5'
+        }
+      })
+    });
+
+    assertEqual(status, 200, 'Status devrait être 200');
+    assertEqual(data.code_cles, 'Code C3, Code D4, Code E5', 'Codes clés devraient être mis à jour');
+  });
+
+  // Test 10: Publication d'une semaine
   await runner.test('Publication d\'une semaine', async () => {
     const { data, status } = await apiCall('/api/planning', {
       method: 'POST',
@@ -308,7 +331,7 @@ async function runTests() {
     assert(data.published_at, 'Date de publication devrait être définie');
   });
 
-  // Test 10: Accès mode public après publication
+  // Test 11: Accès mode public après publication
   await runner.test('Accès mode public après publication', async () => {
     const { data, status } = await apiCall(`/api/planning?token=${testPlanningToken}&type=full`);
 
@@ -320,9 +343,10 @@ async function runTests() {
     const semaine = data.semaines.find(s => s.id === testSemaineId);
     assert(semaine, 'Semaine publiée devrait être visible');
     assertEqual(semaine.is_published, true, 'Semaine devrait être marquée comme publiée');
+    assertEqual(semaine.code_cles, 'Code C3, Code D4, Code E5', 'Codes clés devraient être visibles');
   });
 
-  // Test 11: Import CSV familles
+  // Test 12: Import CSV familles
   await runner.test('Template import familles', async () => {
     const { data, status } = await apiCall(`/api/familles?token=${testPlanningToken}&action=template`);
 
@@ -333,7 +357,7 @@ async function runTests() {
     assert(data.headers.includes('telephone'), 'Header telephone devrait être présent');
   });
 
-  // Test 12: Statistiques
+  // Test 13: Statistiques
   await runner.test('Statistiques du planning', async () => {
     const { data, status } = await apiCall(`/api/planning?token=${testPlanningToken}&type=stats`, {
       headers: {
@@ -351,7 +375,7 @@ async function runTests() {
     assert(stats.total_affectations !== undefined, 'total_affectations devrait être défini');
   });
 
-  // Test 13: Authentification incorrecte
+  // Test 14: Authentification incorrecte
   await runner.test('Test authentification incorrecte', async () => {
     const { status } = await apiCall('/api/auth', {
       method: 'POST',
@@ -367,7 +391,7 @@ async function runTests() {
     assertEqual(status, 401, 'Status devrait être 401 (non autorisé)');
   });
 
-  // Test 14: Accès sans permissions admin
+  // Test 15: Accès sans permissions admin
   await runner.test('Test accès sans permissions admin', async () => {
     const { status } = await apiCall('/api/planning', {
       method: 'POST',
@@ -385,14 +409,14 @@ async function runTests() {
     assertEqual(status, 403, 'Status devrait être 403 (interdit)');
   });
 
-  // Test 15: Token planning invalide
+  // Test 16: Token planning invalide
   await runner.test('Test token planning invalide', async () => {
     const { status } = await apiCall(`/api/planning?token=invalid_token&type=full`);
 
     assertEqual(status, 401, 'Status devrait être 401 (token invalide)');
   });
 
-  // Test 16: Nettoyage (suppression du planning de test)
+  // Test 17: Nettoyage (suppression du planning de test)
   await runner.test('Nettoyage - Déconnexion admin', async () => {
     const { data, status } = await apiCall('/api/auth', {
       method: 'DELETE',

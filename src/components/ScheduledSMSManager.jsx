@@ -228,8 +228,8 @@ export function ScheduledSMSManager({ token, sessionToken, canEdit }) {
   const createDefaultKeyBoxSMS = () => {
     setFormData({
       name: 'Code boîte à clés',
-      description: 'SMS automatique envoyé le mardi à 10h pour donner le code de la boîte à clés aux familles avec nettoyage cette semaine',
-      message_template: 'Bonjour {nom_famille}, vous avez un nettoyage cette semaine ({classe_nom}). Le code de la boîte à clés est: 1234. Merci ! - {planning_name}',
+      description: 'SMS automatique envoyé le mardi à 10h pour donner les codes clés aux familles avec nettoyage cette semaine',
+      message_template: 'Bonjour {nom_famille}, vous avez un nettoyage cette semaine ({classe_nom}). Codes clés: {codes_cles}. Consultez le planning: {planning_url}. Merci ! - {planning_name}',
       day_of_week: 2, // Mardi
       hour: 10,
       minute: 0,

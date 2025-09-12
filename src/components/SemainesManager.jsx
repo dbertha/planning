@@ -9,6 +9,8 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, semaineId: null, semaineName: null });
+  const [editCodesModal, setEditCodesModal] = useState({ isOpen: false, semaine: null });
+  const [editCodes, setEditCodes] = useState('');
 
   // Formulaire pour nouvelle semaine
   const [newSemaine, setNewSemaine] = useState({
@@ -17,6 +19,7 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
     fin: '',
     type: 'nettoyage',
     description: '',
+    code_cles: '',
     is_published: false
   });
 
@@ -98,6 +101,7 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
         fin: '',
         type: 'nettoyage',
         description: '',
+        code_cles: '',
         is_published: false
       });
       setShowAddForm(false);
@@ -156,6 +160,45 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
 
       await loadSemaines();
       // refreshData() supprimé pour éviter le rechargement complet
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCodes = (semaine) => {
+    setEditCodesModal({ isOpen: true, semaine });
+    setEditCodes(semaine.code_cles || '');
+  };
+
+  const saveCodes = async () => {
+    if (!editCodesModal.semaine) return;
+
+    try {
+      setLoading(true);
+      const response = await fetch('/api/planning', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Session': localStorage.getItem('adminSessionToken')
+        },
+        body: JSON.stringify({
+          token,
+          type: 'semaine',
+          id: editCodesModal.semaine.id,
+          data: { code_cles: editCodes }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erreur lors de la mise à jour');
+      }
+
+      setEditCodesModal({ isOpen: false, semaine: null });
+      setEditCodes('');
+      await loadSemaines();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -430,6 +473,19 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
             </div>
 
             <div className="form-group">
+              <label>Codes clés</label>
+              <input
+                type="text"
+                value={newSemaine.code_cles}
+                onChange={(e) => setNewSemaine({ ...newSemaine, code_cles: e.target.value })}
+                placeholder="Code A1, Code B2, etc. (séparés par des virgules)"
+              />
+              <small style={{ color: '#666', fontSize: '0.8rem' }}>
+                Ces codes seront disponibles dans les SMS planifiés via la variable {'{codes_cles}'}
+              </small>
+            </div>
+
+            <div className="form-group">
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -492,6 +548,12 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                   </div>
                 )}
 
+                {semaine.code_cles && (
+                  <div className="semaine-codes">
+                    <strong>Codes clés:</strong> {semaine.code_cles}
+                  </div>
+                )}
+
                 {semaine.published_at && (
                   <div className="published-at">
                     Publiée le: {new Date(semaine.published_at).toLocaleDateString('fr-FR')}
@@ -499,6 +561,14 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
                 )}
 
                 <div className="semaine-actions">
+                  <button
+                    onClick={() => handleEditCodes(semaine)}
+                    className="btn btn-outline"
+                    disabled={loading}
+                    title="Modifier les codes clés"
+                  >
+                    🔑 Codes
+                  </button>
                   <button
                     onClick={() => handleTogglePublication(semaine.id, semaine.is_published)}
                     className={`btn ${semaine.is_published ? 'btn-warning' : 'btn-success'}`}
@@ -531,6 +601,53 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
         confirmText="Supprimer la semaine"
         cancelText="Annuler"
       />
+
+      {/* Modal d'édition des codes clés */}
+      {editCodesModal.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>🔑 Codes clés - {editCodesModal.semaine?.id}</h3>
+              <button 
+                onClick={() => setEditCodesModal({ isOpen: false, semaine: null })}
+                className="modal-close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Codes clés pour cette semaine :</label>
+                <input
+                  type="text"
+                  value={editCodes}
+                  onChange={(e) => setEditCodes(e.target.value)}
+                  placeholder="Code A1, Code B2, etc. (séparés par des virgules)"
+                  style={{ width: '100%', padding: '0.5rem', marginTop: '0.25rem' }}
+                />
+                <small style={{ color: '#666', fontSize: '0.8rem', marginTop: '0.5rem', display: 'block' }}>
+                  Ces codes seront disponibles dans les SMS planifiés via la variable {'{codes_cles}'}
+                </small>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                onClick={() => setEditCodesModal({ isOpen: false, semaine: null })}
+                className="btn btn-secondary"
+              >
+                Annuler
+              </button>
+              <button 
+                onClick={saveCodes}
+                disabled={loading}
+                className="btn btn-primary"
+              >
+                {loading ? 'Sauvegarde...' : 'Sauvegarder'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .semaines-manager {
@@ -733,6 +850,16 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
           font-style: italic;
         }
 
+        .semaine-codes {
+          font-size: 12px;
+          color: #007bff;
+          margin-bottom: 8px;
+          background: #f8f9fa;
+          padding: 4px 8px;
+          border-radius: 4px;
+          border-left: 3px solid #007bff;
+        }
+
         .published-at {
           font-size: 11px;
           color: #999;
@@ -782,6 +909,12 @@ function SemainesManager({ token, canEdit, refreshData, refreshPlanningGrid, tog
         .btn-warning {
           background: #ffc107;
           color: #212529;
+        }
+
+        .btn-outline {
+          background: transparent;
+          color: #007bff;
+          border: 1px solid #007bff;
         }
 
         .btn:hover {

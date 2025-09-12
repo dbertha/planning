@@ -1,10 +1,10 @@
 # Intégration SMS - Documentation
 
-Cette documentation décrit l'intégration SMS dans l'application Planning, supportant les providers **Twilio** et **Spryng**.
+Cette documentation décrit l'intégration SMS dans l'application Planning, supportant les providers **Twilio**, **Spryng** et **SMSFactor**.
 
 ## 🚀 Fonctionnalités
 
-- ✅ **Dual Provider** : Support de Twilio et Spryng avec switch automatique
+- ✅ **Multi Provider** : Support de Twilio, Spryng et SMSFactor avec switch automatique
 - ✅ **Templates SMS** : Messages prédéfinis pour différents scénarios
 - ✅ **Envoi ciblé** : Famille individuelle, semaine, ou envoi en masse
 - ✅ **Mode Test/Production** : Simulation sécurisée ou envoi réel
@@ -21,6 +21,7 @@ Cette documentation décrit l'intégration SMS dans l'application Planning, supp
 SMS_ENABLED=true
 SMS_PROVIDER=twilio
 # SMS_PROVIDER=spryng
+# SMS_PROVIDER=smsfactor
 
 # Configuration Twilio SMS (recommandé)
 TWILIO_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -29,6 +30,10 @@ TWILIO_SENDER=+15551234567
 
 # Configuration Spryng SMS (alternative)
 SPRYNG_API_KEY=your_spryng_api_key_here
+SMS_SENDER=your_sender_name_or_number
+
+# Configuration SMSFactor SMS (alternative française)
+SMS_FACTOR_API_TOKEN=your_smsfactor_token_here
 SMS_SENDER=your_sender_name_or_number
 
 # Numéro de test personnel
@@ -61,6 +66,22 @@ NODE_ENV=development
    SPRYNG_API_KEY=your_api_key_here
    SMS_SENDER=PlanningApp
    ```
+
+### Configuration SMSFactor
+
+1. **Créer un compte SMSFactor** : [smsfactor.com](https://www.smsfactor.com)
+2. **Récupérer le token API** depuis votre tableau de bord
+3. **Ajouter dans .env.local** :
+   ```bash
+   SMS_FACTOR_API_TOKEN=your_token_here
+   SMS_SENDER=PlanningApp
+   ```
+
+**Notes SMSFactor :**
+- Format de numéro : international sans le `+` (ex: `33612345678`)
+- Expéditeur : maximum 11 caractères alphanumériques ou numéro de téléphone
+- API REST simple avec paramètres GET
+- Gestion automatique des crédits et accusés de réception
 
 ## 🔧 Installation
 
@@ -118,10 +139,10 @@ curl -X POST http://localhost:3000/api/sms \
 
 | Template | Description | Variables |
 |----------|-------------|-----------|
-| `affectation_rappel` | Rappel d'affectation | `{nom_famille}`, `{classe_nom}`, `{date_debut}`, `{date_fin}` |
-| `affectation_nouvelle` | Nouvelle affectation | `{nom_famille}`, `{classe_nom}`, `{date_debut}`, `{date_fin}` |
-| `semaine_publiee` | Semaine publiée | `{date_debut}`, `{date_fin}`, `{planning_url}` |
-| `rappel_general` | Rappel général | `{planning_name}` |
+| `affectation_rappel` | Rappel d'affectation | `{nom_famille}`, `{classe_nom}`, `{date_debut}`, `{date_fin}`, `{codes_cles}` |
+| `affectation_nouvelle` | Nouvelle affectation | `{nom_famille}`, `{classe_nom}`, `{date_debut}`, `{date_fin}`, `{codes_cles}` |
+| `semaine_publiee` | Semaine publiée | `{date_debut}`, `{date_fin}`, `{codes_cles}`, `{planning_url}` |
+| `rappel_general` | Rappel général | `{planning_name}`, `{codes_cles}` |
 | `personnalise` | Message libre | `{message}` |
 
 ### Exemple de template
@@ -130,10 +151,23 @@ curl -X POST http://localhost:3000/api/sms \
 {
   "affectation_rappel": {
     "name": "Rappel d'affectation",
-    "template": "Bonjour {nom_famille}, vous êtes assigné(e) au nettoyage de {classe_nom} pour la semaine du {date_debut} au {date_fin}. Merci ! - {planning_name}"
+    "template": "Bonjour {nom_famille}, vous êtes assigné(e) au nettoyage de {classe_nom} pour la semaine du {date_debut} au {date_fin}. Codes clés: {codes_cles}. Consultez le planning: {planning_url}. Merci ! - {planning_name}"
   }
 }
 ```
+
+### Variables disponibles
+
+| Variable | Description | Exemple |
+|----------|-------------|---------|
+| `{nom_famille}` | Nom de la famille | "Famille Dupont" |
+| `{classe_nom}` | Nom de la classe/zone | "Salle A1" |
+| `{date_debut}` | Date de début de la semaine | "01/02/2024" |
+| `{date_fin}` | Date de fin de la semaine | "07/02/2024" |
+| `{codes_cles}` | Codes clés de la semaine | "Code A1, Code B2, Code C3" |
+| `{planning_name}` | Nom du planning | "Planning École 2024" |
+| `{planning_url}` | URL du planning | "https://planning.ecole.com?token=abc123" |
+| `{message}` | Message personnalisé (template personnalisé uniquement) | Texte libre |
 
 ## 🧪 Tests
 
@@ -184,13 +218,15 @@ curl -X POST http://localhost:3000/api/sms \
 
 ### Comparaison des providers
 
-| Fonctionnalité | Twilio | Spryng |
-|----------------|--------|--------|
-| **Fiabilité** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Coverage Belgique** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **Pricing** | Moyen | Compétitif |
-| **Documentation** | Excellente | Bonne |
-| **Features** | Très riche | Standard |
+| Fonctionnalité | Twilio | Spryng | SMSFactor |
+|----------------|--------|--------|-----------|
+| **Fiabilité** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **Coverage Belgique** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| **Coverage France** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| **Pricing** | Moyen | Compétitif | Très compétitif |
+| **Documentation** | Excellente | Bonne | Correcte |
+| **Features** | Très riche | Standard | Standard |
+| **API Simplicité** | Complexe | Moyenne | Simple |
 
 ## 🔒 Sécurité
 
@@ -219,7 +255,7 @@ curl -X POST http://localhost:3000/api/sms \
 ```bash
 # Vérifier la variable SMS_PROVIDER
 echo $SMS_PROVIDER
-# Doit être 'twilio' ou 'spryng'
+# Doit être 'twilio', 'spryng' ou 'smsfactor'
 ```
 
 #### "TWILIO_SID manquant"
@@ -232,6 +268,18 @@ grep TWILIO .env.local
 #### "API erreur 404"
 - Vérifier que `TWILIO_SID` commence par `AC` (Account SID) et non `SK` (API Key)
 - Vérifier que l'Auth Token est correct
+
+#### "SMS_FACTOR_API_TOKEN manquant"
+```bash
+# Vérifier les variables SMSFactor
+grep SMS_FACTOR .env.local
+# Doit contenir SMS_FACTOR_API_TOKEN
+```
+
+#### "Erreur authentification SMSFactor"
+- Vérifier que le token API est valide et actif
+- Vérifier que votre compte SMSFactor a des crédits disponibles
+- Le token ne doit pas commencer par un espace ou contenir de caractères spéciaux
 
 #### "SMS non reçu"
 1. **Vérifier le mode** : `testMode: true` = simulation, `testMode: false` = envoi réel
@@ -294,11 +342,21 @@ curl -X POST http://localhost:3000/api/sms \
 3. **Redémarrer** le serveur
 4. **Tester** la configuration
 
+### Vers SMSFactor
+
+1. **Configurer SMSFactor** dans `.env.local`
+2. **Changer le provider** : `SMS_PROVIDER=smsfactor`
+3. **Redémarrer** le serveur
+4. **Tester** la configuration
+
 ### Rollback rapide
 
 ```bash
 # En cas de problème, retour à Spryng
 SMS_PROVIDER=spryng npm run dev:api
+
+# Ou vers SMSFactor
+SMS_PROVIDER=smsfactor npm run dev:api
 ```
 
 ## 🚀 Déploiement
@@ -308,11 +366,17 @@ SMS_PROVIDER=spryng npm run dev:api
 ```bash
 # Production .env
 SMS_ENABLED=true
-SMS_PROVIDER=twilio
+SMS_PROVIDER=twilio  # ou smsfactor
 NODE_ENV=production
+
+# Configuration Twilio
 TWILIO_SID=ACxxxx...
 TWILIO_AUTH_TOKEN=xxxx...
 TWILIO_SENDER=+15551234567
+
+# OU Configuration SMSFactor
+SMS_FACTOR_API_TOKEN=your_production_token
+SMS_SENDER=YourApp
 ```
 
 ### Vérification pré-déploiement
@@ -333,6 +397,7 @@ curl -X POST https://yourapp.com/api/sms \
 
 - **Twilio Documentation** : [twilio.com/docs](https://www.twilio.com/docs)
 - **Spryng Documentation** : [spryng.be/api](https://spryng.be/api)
+- **SMSFactor Documentation** : [doc.smsfactor.com](https://doc.smsfactor.com)
 - **E.164 Format** : [en.wikipedia.org/wiki/E.164](https://en.wikipedia.org/wiki/E.164)
 
 ## 🤝 Support

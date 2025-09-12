@@ -110,6 +110,7 @@ const SMSManager = ({
       if (semaine) {
         message = message.replace('{date_debut}', new Date(semaine.debut).toLocaleDateString('fr-FR'));
         message = message.replace('{date_fin}', new Date(semaine.fin).toLocaleDateString('fr-FR'));
+        message = message.replace('{codes_cles}', semaine.code_cles || '');
       }
     }
 
@@ -447,6 +448,28 @@ const SMSManager = ({
               </div>
             </div>
           )}
+
+          {/* Variables disponibles */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label>Variables disponibles :</label>
+            <div style={{ 
+              background: '#e9ecef', 
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              padding: '0.75rem',
+              marginTop: '0.25rem',
+              fontSize: '0.8rem'
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem' }}>
+                <div><code>{'{nom_famille}'}</code> - Nom de la famille</div>
+                <div><code>{'{classe_nom}'}</code> - Nom de la classe</div>
+                <div><code>{'{date_debut}'}</code> - Date de début</div>
+                <div><code>{'{date_fin}'}</code> - Date de fin</div>
+                <div><code>{'{planning_name}'}</code> - Nom du planning</div>
+                <div><code>{'{codes_cles}'}</code> - Codes clés de la semaine</div>
+              </div>
+            </div>
+          </div>
 
           {/* Aperçu du message */}
           {previewMessage && (

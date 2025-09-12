@@ -184,6 +184,16 @@ async function testSMSConfiguration() {
     const template = templates.affectation_rappel;
     assert(template.name, 'Template devrait avoir un nom');
     assert(template.template, 'Template devrait avoir un contenu');
+    assert(template.template.includes('{codes_cles}'), 'Template affectation_rappel devrait contenir {codes_cles}');
+    
+    // Vérifier que tous les templates pertinents contiennent {codes_cles}
+    const templatesWithCodes = ['affectation_rappel', 'affectation_nouvelle', 'semaine_publiee', 'rappel_general'];
+    templatesWithCodes.forEach(templateKey => {
+      if (templates[templateKey]) {
+        assert(templates[templateKey].template.includes('{codes_cles}'), 
+          `Template ${templateKey} devrait contenir {codes_cles}`);
+      }
+    });
   });
 
   return runner.summary();
@@ -261,7 +271,7 @@ async function testSMSSending() {
     assert(classeResponse.data.id, 'Classe devrait avoir un ID');
     assertEqual(classeResponse.data.id, 'TEST_SMS', 'ID de classe devrait correspondre');
 
-    // 3. Créer une semaine
+    // 3. Créer une semaine avec codes clés
     const semaineResponse = await apiCall('/api/planning', {
       method: 'POST',
       headers: {
@@ -269,15 +279,23 @@ async function testSMSSending() {
       },
       body: {
         token: testPlanningToken,
-        type: 'create_next_week',
-        data: {}
+        type: 'semaine',
+        data: {
+          id: 'TEST_SMS_WEEK',
+          debut: '2024-02-01',
+          fin: '2024-02-07',
+          type: 'nettoyage',
+          description: 'Semaine de test SMS',
+          code_cles: 'Code A1, Code B2, Code C3',
+          is_published: true
+        }
       }
     });
 
     assertEqual(semaineResponse.status, 201, 'Status création semaine devrait être 201');
-    assert(semaineResponse.data.success, 'Création de semaine devrait réussir');
-    assert(semaineResponse.data.semaine.id, 'Semaine devrait avoir un ID');
-    testSemaineId = semaineResponse.data.semaine.id;
+    assertEqual(semaineResponse.data.id, 'TEST_SMS_WEEK', 'ID semaine devrait correspondre');
+    assertEqual(semaineResponse.data.code_cles, 'Code A1, Code B2, Code C3', 'Codes clés devraient être sauvegardés');
+    testSemaineId = semaineResponse.data.id;
 
     // 4. Créer une famille avec téléphone
     const familleResponse = await apiCall('/api/familles', {
@@ -374,6 +392,36 @@ async function testSMSSending() {
 
     assertEqual(response.status, 200, 'Status devrait être 200');
     assert(response.data.success, 'Envoi SMS personnalisé devrait réussir');
+  });
+
+  // Test d'envoi SMS avec codes clés
+  await runner.test('Envoi SMS avec codes clés de la semaine', async () => {
+    const response = await apiCall('/api/sms', {
+      method: 'POST',
+      headers: {
+        'X-Admin-Session': testSessionToken
+      },
+      body: {
+        token: testPlanningToken,
+        action: 'send_to_affectations',
+        data: {
+          semaine_id: testSemaineId,
+          template_key: 'personnalise',
+          message_personnalise: 'Bonjour {nom_famille}, vous êtes affecté à {classe_nom} du {date_debut} au {date_fin}. Codes clés: {codes_cles}. Cordialement, {planning_name}'
+        }
+      }
+    });
+
+    assertEqual(response.status, 200, 'Status devrait être 200');
+    assert(response.data.success, 'Envoi SMS avec codes clés devrait réussir');
+    assert(response.data.sent >= 1, 'Au moins un SMS devrait être envoyé');
+    
+    // Vérifier que les codes clés sont bien remplacés dans le message
+    const result = response.data.results[0];
+    assert(result.success, 'Résultat individuel devrait être un succès');
+    assert(result.message.includes('Code A1, Code B2, Code C3'), 'Le message devrait contenir les codes clés');
+    assert(result.message.includes('Famille Test SMS'), 'Le message devrait contenir le nom de famille');
+    assert(result.message.includes('Classe Test SMS'), 'Le message devrait contenir le nom de classe');
   });
 
   // Test d'envoi SMS aux affectations d'une semaine

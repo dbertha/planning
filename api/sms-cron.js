@@ -336,6 +336,7 @@ async function executeScheduledSMS(scheduledSMS) {
           date_debut: recipient.debut ? new Date(recipient.debut).toLocaleDateString('fr-FR') : '',
           date_fin: recipient.fin ? new Date(recipient.fin).toLocaleDateString('fr-FR') : '',
           planning_name: scheduledSMS.planning_name,
+          planning_url: `${process.env.PLANNING_BASE_URL || 'https://entretien.laec.be'}?token=${scheduledSMS.planning_token}`,
           codes_cles: recipient.code_cles || ''
         };
         
