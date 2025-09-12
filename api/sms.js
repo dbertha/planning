@@ -52,19 +52,19 @@ const SMS_CONFIG = {
 const SMS_TEMPLATES = {
   affectation_rappel: {
     name: 'Rappel d\'affectation',
-    template: 'Bonjour {nom_famille}, vous êtes assigné(e) au nettoyage de {classe_nom} pour la semaine du {date_debut} au {date_fin}. Merci ! - {planning_name}'
+    template: 'Bonjour {nom_famille}, vous êtes assigné(e) au nettoyage de {classe_nom} pour la semaine du {date_debut} au {date_fin}. Codes clés: {codes_cles}. Merci ! - {planning_name}'
   },
   affectation_nouvelle: {
     name: 'Nouvelle affectation',
-    template: 'Nouvelle affectation ! {nom_famille}, vous avez été assigné(e) au nettoyage de {classe_nom} pour la semaine du {date_debut} au {date_fin}. - {planning_name}'
+    template: 'Nouvelle affectation ! {nom_famille}, vous avez été assigné(e) au nettoyage de {classe_nom} pour la semaine du {date_debut} au {date_fin}. Codes clés: {codes_cles}. - {planning_name}'
   },
   semaine_publiee: {
     name: 'Semaine publiée',
-    template: 'Le planning de la semaine du {date_debut} au {date_fin} est disponible. Consultez vos affectations sur {planning_url}. - {planning_name}'
+    template: 'Le planning de la semaine du {date_debut} au {date_fin} est disponible. Codes clés: {codes_cles}. Consultez vos affectations sur {planning_url}. - {planning_name}'
   },
   rappel_general: {
     name: 'Rappel général',
-    template: 'Rappel : pensez à effectuer le nettoyage de votre zone cette semaine. Merci pour votre participation ! - {planning_name}'
+    template: 'Rappel : pensez à effectuer le nettoyage de votre zone cette semaine. Codes clés: {codes_cles}. Merci pour votre participation ! - {planning_name}'
   },
   personnalise: {
     name: 'Message personnalisé',
@@ -632,8 +632,8 @@ class SMSFactorSMSService extends BaseSMSService {
         text: message.substring(0, 1600), // Limite raisonnable
         to: normalizedTo,
         token: this.apiToken,
-        pushtype: 'alert', // Type d'envoi par défaut
-        ...(options.sender && { sender: options.sender })
+        pushtype: 'alert' // Type d'envoi par défaut
+        // Pas de paramètre sender pour SMSFactor (Belgique)
       });
 
       const response = await fetch(`${SMSFACTOR_BASE_URL}/send?${params.toString()}`, {

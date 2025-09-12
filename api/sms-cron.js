@@ -95,7 +95,8 @@ function createSMSServiceForCron() {
     return {
       sendSMS: async (to, message, templateData = {}) => {
         const apiToken = process.env.SMS_FACTOR_API_TOKEN;
-        const sender = process.env.SMS_SENDER || 'Planning';
+        // SMSFactor ne permet pas d'expéditeur personnalisé pour la Belgique
+        // Ne pas utiliser de paramètre sender
         
         if (!apiToken) {
           throw new Error('Configuration SMSFactor incomplète');
@@ -116,13 +117,12 @@ function createSMSServiceForCron() {
           };
         }
 
-        // Envoi réel via SMSFactor
+        // Envoi réel via SMSFactor (sans paramètre sender pour la Belgique)
         const params = new URLSearchParams({
           text: message.substring(0, 1600),
           to: normalizedTo,
           token: apiToken,
-          pushtype: 'alert',
-          sender: sender
+          pushtype: 'alert'
         });
 
         const response = await fetch(`https://api.smsfactor.com/send?${params.toString()}`, {
