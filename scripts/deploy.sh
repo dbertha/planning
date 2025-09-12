@@ -64,6 +64,11 @@ fi
 echo "[$(date -Iseconds)] Rechargement de Nginx pour appliquer les nouvelles ressources" | tee -a "$LOGFILE"
 docker compose exec -T nginx nginx -s reload || echo "Nginx reload failed, but continuing" | tee -a "$LOGFILE"
 
+# 5.3. Vider le cache nginx et forcer le rechargement des fichiers statiques
+echo "[$(date -Iseconds)] Vidage du cache nginx et rechargement des fichiers statiques" | tee -a "$LOGFILE"
+docker compose exec -T nginx find /usr/share/nginx/html -name "*.js" -o -name "*.css" | head -5 | tee -a "$LOGFILE"
+docker compose exec -T nginx nginx -s reload || echo "Nginx reload failed, but continuing" | tee -a "$LOGFILE"
+
 # 5. Optionnel : lancer migrations si le service expose la commande
 if docker compose ps --status running | grep -q "$APP_SERVICE_NAME"; then
   if docker compose exec -T "$APP_SERVICE_NAME" sh -lc "command -v node >/dev/null 2>&1 && test -f package.json"; then
