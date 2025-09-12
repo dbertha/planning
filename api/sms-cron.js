@@ -220,18 +220,10 @@ function normalizeSMSFactorPhoneNumber(phone) {
  */
 async function getFamiliesWithCurrentWeekCleaning(planningToken) {
   try {
-    // Calculer la semaine courante (lundi à dimanche)
-    const now = new Date();
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - now.getDay() + 1);
+    // Obtenir la date d'aujourd'hui
+    const today = new Date().toISOString().split('T')[0];
     
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    
-    const mondayStr = monday.toISOString().split('T')[0];
-    const sundayStr = sunday.toISOString().split('T')[0];
-    
-    console.log(`🗓️ Recherche affectations semaine courante: ${mondayStr} → ${sundayStr}`);
+    console.log(`🗓️ Recherche affectations pour la semaine contenant: ${today}`);
     
     // Importer query depuis db.js
     const { query } = await import('./db.js');
@@ -248,10 +240,10 @@ async function getFamiliesWithCurrentWeekCleaning(planningToken) {
       JOIN plannings p ON f.planning_id = p.id
       WHERE p.token = $1 
         AND f.is_active = true
-        AND s.debut >= $2 
-        AND s.fin <= $3
+        AND s.debut <= $2 
+        AND s.fin >= $2
         AND s.is_published = true
-    `, [planningToken, mondayStr, sundayStr]);
+    `, [planningToken, today]);
     
     return result.rows;
   } catch (error) {
