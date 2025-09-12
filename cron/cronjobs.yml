@@ -20,3 +20,7 @@ jobs:
     schedule: "0 12 * * *"           # tous les jours à midi
     command: "cd /srv/ecole-app && docker compose exec -T certbot certbot renew --quiet && docker compose exec -T nginx nginx -s reload"
     comment: "Vérification et renouvellement automatique des certificats SSL"
+  - name: scheduled-sms
+    schedule: "*/15 * * * *"         # chaque 15 minutes
+    command: "curl -s https://entretien.laec.be/api/sms-cron"
+    comment: "Exécution des SMS planifiés"

@@ -5,7 +5,7 @@
  * À appeler toutes les minutes via un cron job ou service externe
  */
 
-import { getScheduledSMSToExecute } from './db.js';
+import { getScheduledSMSToExecute, updateScheduledSMSLastExecuted } from './db.js';
 
 // Configuration (avec trim pour éviter les \n)
 const SMS_CONFIG = {
@@ -240,7 +240,7 @@ async function getFamiliesWithCurrentWeekCleaning(planningToken) {
       SELECT DISTINCT
         f.id, f.nom, f.telephone,
         c.nom as classe_nom,
-        s.debut, s.fin, s.description as semaine_description
+        s.debut, s.fin, s.description as semaine_description, s.code_cles
       FROM familles f
       JOIN affectations a ON f.id = a.famille_id
       JOIN classes c ON a.classe_id = c.id AND a.planning_id = c.planning_id
@@ -288,7 +288,7 @@ async function getAllActiveFamilies(planningToken) {
 function replaceMessageVariables(message, data) {
   const placeholders = [
     '{nom_famille}', '{classe_nom}', '{date_debut}', '{date_fin}',
-    '{planning_name}', '{planning_url}', '{message}'
+    '{planning_name}', '{planning_url}', '{message}', '{codes_cles}'
   ];
 
   placeholders.forEach(placeholder => {
@@ -343,7 +343,8 @@ async function executeScheduledSMS(scheduledSMS) {
           classe_nom: recipient.classe_nom || '',
           date_debut: recipient.debut ? new Date(recipient.debut).toLocaleDateString('fr-FR') : '',
           date_fin: recipient.fin ? new Date(recipient.fin).toLocaleDateString('fr-FR') : '',
-          planning_name: scheduledSMS.planning_name
+          planning_name: scheduledSMS.planning_name,
+          codes_cles: recipient.code_cles || ''
         };
         
         // Remplacer les variables dans le message
@@ -377,6 +378,16 @@ async function executeScheduledSMS(scheduledSMS) {
     }
     
     console.log(`📊 SMS planifié "${scheduledSMS.name}" terminé: ${sent} envoyés, ${errors} erreurs`);
+    
+    // Mettre à jour last_executed_date si au moins un SMS a été envoyé
+    if (sent > 0) {
+      try {
+        await updateScheduledSMSLastExecuted(scheduledSMS.id);
+        console.log(`✅ last_executed_date mis à jour pour "${scheduledSMS.name}"`);
+      } catch (error) {
+        console.error(`❌ Erreur mise à jour last_executed_date pour "${scheduledSMS.name}":`, error.message);
+      }
+    }
     
     return {
       success: true,
