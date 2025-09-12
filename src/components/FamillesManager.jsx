@@ -143,6 +143,7 @@ function FamillesManager({ token, canEdit, refreshData, sessionToken }) {
             nom: editingFamille.nom,
             email: editingFamille.email,
             telephone: editingFamille.telephone,
+            telephone2: editingFamille.telephone2,
             nb_nettoyage: editingFamille.nb_nettoyage,
             classes_preferences: editingFamille.classes_preferences,
             notes: editingFamille.notes
