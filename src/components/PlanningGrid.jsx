@@ -138,24 +138,28 @@ export function PlanningGrid({ data, filters, isAdmin, canEdit, onCreateAffectat
 
   return (
     <div className="planning-body">
-      {data.semaines.map(semaine => (
-        <WeekRow 
-          key={semaine.id}
-          semaine={semaine}
-          classes={data.classes}
-          familles={data.familles}
-          affectations={filteredAffectations}
-          allAffectations={data.affectations}
-          filters={filters}
-          onAffectationMove={handleMove}
-          onFamilleDrop={handleFamilleDrop}
-          onOverwriteRequest={handleOverwriteRequest}
-          isAdmin={isAdmin}
-          canEdit={canEdit}
-          onAutoDistribute={onAutoDistribute}
-          onTogglePublish={onTogglePublish}
-        />
-      ))}
+      {data.semaines.map((semaine, index) => {
+        const nextSemaine = index < data.semaines.length - 1 ? data.semaines[index + 1] : null;
+        return (
+          <WeekRow 
+            key={semaine.id}
+            semaine={semaine}
+            classes={data.classes}
+            familles={data.familles}
+            affectations={filteredAffectations}
+            allAffectations={data.affectations}
+            filters={filters}
+            onAffectationMove={handleMove}
+            onFamilleDrop={handleFamilleDrop}
+            onOverwriteRequest={handleOverwriteRequest}
+            isAdmin={isAdmin}
+            canEdit={canEdit}
+            onAutoDistribute={onAutoDistribute}
+            onTogglePublish={onTogglePublish}
+            nextSemaine={nextSemaine}
+          />
+        );
+      })}
 
       {exchangeProposal && (
         <ConfirmationPopup

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { AddToCalendarButton } from './AddToCalendarButton';
+import { getCleaningDates } from '../utils/dateUtils';
 
 export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
   // Fonction pour formater les dates
@@ -84,7 +85,13 @@ export function MobilePlanningView({ data, filters, isAdmin, canEdit }) {
               <div className="week-header">
                 <div className="week-dates">
                   <span className="week-period">
-                    {formatDate(semaine.debut)} - {formatDate(semaine.fin)}
+                    {(() => {
+                      // Trouver la semaine suivante
+                      const currentIndex = data.semaines.findIndex(s => s.id === semaine.id);
+                      const nextSemaine = currentIndex < data.semaines.length - 1 ? data.semaines[currentIndex + 1] : null;
+                      const cleaningDates = getCleaningDates(semaine, nextSemaine);
+                      return `${cleaningDates.debutFormatted} - ${cleaningDates.finFormatted}`;
+                    })()}
                   </span>
                   {isCurrentWeek && (
                     <span className="current-badge">👉 Cette semaine</span>

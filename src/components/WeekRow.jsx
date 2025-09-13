@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { AffectationCell } from './AffectationCell';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, getCleaningDates } from '../utils/dateUtils';
 import { useToast } from './Toast';
 
-export function WeekRow({ semaine, classes, familles, affectations, allAffectations, filters, onAffectationMove, onFamilleDrop, onOverwriteRequest, isAdmin, canEdit, onAutoDistribute, onTogglePublish }) {
+export function WeekRow({ semaine, classes, familles, affectations, allAffectations, filters, onAffectationMove, onFamilleDrop, onOverwriteRequest, isAdmin, canEdit, onAutoDistribute, onTogglePublish, nextSemaine }) {
   const isPublished = semaine.is_published;
   const [isDistributing, setIsDistributing] = useState(false);
   const toast = useToast();
@@ -62,7 +62,10 @@ export function WeekRow({ semaine, classes, familles, affectations, allAffectati
       <div className="semaine-sidebar">
         <div className="semaine-info">
           <div className="semaine-dates">
-            {formatDate(semaine.debut)} - {formatDate(semaine.fin)}
+            {(() => {
+              const cleaningDates = getCleaningDates(semaine, nextSemaine);
+              return `${cleaningDates.debutFormatted} - ${cleaningDates.finFormatted}`;
+            })()}
           </div>
           {semaine.type === 'SPECIAL' && (
             <div className="semaine-special">{semaine.description}</div>
