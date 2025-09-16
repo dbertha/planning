@@ -230,7 +230,7 @@ async function getFamiliesWithCurrentWeekCleaning(planningToken) {
     
     const result = await query(`
       SELECT DISTINCT
-        f.id, f.nom, f.telephone,
+        f.id, f.nom, f.telephone, f.telephone2,
         c.nom as classe_nom,
         s.debut, s.fin, s.description as semaine_description, s.code_cles
       FROM familles f
@@ -260,7 +260,7 @@ async function getAllActiveFamilies(planningToken) {
     const { query } = await import('./db.js');
     
     const result = await query(`
-      SELECT f.id, f.nom, f.telephone, f.email
+      SELECT f.id, f.nom, f.telephone, f.telephone2, f.email
       FROM familles f
       JOIN plannings p ON f.planning_id = p.id
       WHERE p.token = $1 AND f.is_active = true
@@ -343,23 +343,38 @@ async function executeScheduledSMS(scheduledSMS) {
         // Remplacer les variables dans le message
         const finalMessage = replaceMessageVariables(scheduledSMS.message_template, messageData);
         
-        // Envoyer le SMS
-        const result = await smsService.sendSMS(recipient.telephone, finalMessage);
+        // Envoyer aux deux numéros s'ils existent
+        const phones = [recipient.telephone, recipient.telephone2].filter(Boolean);
         
-        if (result.success) {
-          console.log(`✅ SMS envoyé à ${recipient.nom} (${recipient.telephone})`);
-          sent++;
-        } else {
-          console.log(`❌ Échec envoi à ${recipient.nom}: ${result.error}`);
-          errors++;
+        for (const phone of phones) {
+          try {
+            const result = await smsService.sendSMS(phone, finalMessage);
+            
+            if (result.success) {
+              console.log(`✅ SMS envoyé à ${recipient.nom} (${phone})`);
+              sent++;
+            } else {
+              console.log(`❌ Échec envoi à ${recipient.nom} (${phone}): ${result.error}`);
+              errors++;
+            }
+            
+            results.push({
+              famille: recipient.nom,
+              telephone: phone,
+              success: result.success,
+              messageId: result.messageId
+            });
+          } catch (error) {
+            console.log(`❌ Erreur envoi à ${recipient.nom} (${phone}): ${error.message}`);
+            errors++;
+            results.push({
+              famille: recipient.nom,
+              telephone: phone,
+              success: false,
+              error: error.message
+            });
+          }
         }
-        
-        results.push({
-          famille: recipient.nom,
-          telephone: recipient.telephone,
-          success: result.success,
-          messageId: result.messageId
-        });
         
         // Pause entre les envois pour éviter de surcharger l'API
         await new Promise(resolve => setTimeout(resolve, 100));
