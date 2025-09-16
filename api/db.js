@@ -71,6 +71,18 @@ export const initDatabase = async () => {
       ALTER TABLE classes ADD COLUMN IF NOT EXISTS instructions_pdf_url TEXT;
     `);
 
+    // Migration: Corriger le type de last_executed_date de DATE vers TIMESTAMP
+    try {
+      await query(`
+        ALTER TABLE scheduled_sms ALTER COLUMN last_executed_date TYPE timestamp USING last_executed_date::timestamp;
+      `);
+      console.log('Migration: scheduled_sms.last_executed_date corrigé vers TIMESTAMP');
+    } catch (error) {
+      if (error.code !== '42804') { // Ignore error if already TIMESTAMP
+        console.log('Migration: scheduled_sms.last_executed_date déjà TIMESTAMP ou erreur:', error.message);
+      }
+    }
+
     // Migration: Ajouter contrainte d'unicité sur (nom, planning_id) pour familles
     try {
       await query(`
@@ -134,7 +146,7 @@ export const initDatabase = async () => {
         minute INTEGER DEFAULT 0 CHECK (minute >= 0 AND minute <= 59),
         target_type VARCHAR(20) DEFAULT 'current_week', -- 'current_week', 'all_active', 'specific_families'
         is_active BOOLEAN DEFAULT true,
-        last_executed_date DATE, -- Pour éviter les doublons
+        last_executed_date TIMESTAMP, -- Pour éviter les doublons (timestamp complet nécessaire)
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -944,7 +956,15 @@ export const getScheduledSMSToExecute = async () => {
           checkDate.setHours(hour, minute, 0, 0);
           
           // Si cette occurrence est dans les dernières 24h ET avant maintenant
-          if (checkDate >= twentyFourHoursAgo && checkDate < now) {
+          // MAIS pas dans la fenêtre actuelle de "programmé maintenant" (pour éviter les doublons)
+          const isCurrentScheduleWindow = (
+            dayOfWeek === currentDayOfWeek && 
+            hour === currentHour && 
+            minute >= Math.max(0, currentMinute - 5) && 
+            minute <= currentMinute
+          );
+          
+          if (checkDate >= twentyFourHoursAgo && checkDate < now && !isCurrentScheduleWindow) {
             return checkDate;
           }
         }
