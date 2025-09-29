@@ -1021,6 +1021,7 @@ export const getScheduledSMSToExecute = async () => {
       
       if (isScheduledNow) {
         // IMPORTANT: Vérifier si le SMS a déjà été exécuté récemment pour éviter les doublons
+        console.log(`   🔍 Debug "${sms.name}": last_executed_date=${sms.last_executed_date}, type=${typeof sms.last_executed_date}`);
         if (sms.last_executed_date) {
           const lastExecutedUTC = new Date(sms.last_executed_date);
           const nowUTC_copy = new Date(nowUTC);
