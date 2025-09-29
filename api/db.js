@@ -1021,7 +1021,6 @@ export const getScheduledSMSToExecute = async () => {
       
       if (isScheduledNow) {
         // IMPORTANT: Vérifier si le SMS a déjà été exécuté récemment pour éviter les doublons
-        console.log(`   🔍 Debug "${sms.name}": last_executed_date=${sms.last_executed_date}, type=${typeof sms.last_executed_date}`);
         if (sms.last_executed_date) {
           const lastExecutedUTC = new Date(sms.last_executed_date);
           const nowUTC_copy = new Date(nowUTC);
@@ -1038,13 +1037,10 @@ export const getScheduledSMSToExecute = async () => {
           
           // Pour convertir CEST/CET vers UTC : UTC = heure_locale - offset
           const scheduledUTCHour = sms.hour - actualOffset;
-          console.log(`   🔧 Calcul: sms.hour=${sms.hour}, actualOffset=${actualOffset}, scheduledUTCHour=${scheduledUTCHour}`);
           scheduledTodayUTC.setUTCHours(scheduledUTCHour, sms.minute, 0, 0);
           
           // Si déjà exécuté après l'heure planifiée d'aujourd'hui, ne pas ré-exécuter
-          console.log(`   🔍 Comparaison: lastExecuted=${lastExecutedUTC.toISOString()}, scheduledToday=${scheduledTodayUTC.toISOString()}, lastExecuted >= scheduled = ${lastExecutedUTC >= scheduledTodayUTC}`);
           if (lastExecutedUTC >= scheduledTodayUTC) {
-            console.log(`   ⏭️ "${sms.name}" - déjà exécuté aujourd'hui (${lastExecutedUTC.toISOString()} >= ${scheduledTodayUTC.toISOString()})`);
             continue;
           }
         }
@@ -1065,13 +1061,9 @@ export const getScheduledSMSToExecute = async () => {
       // 1. Jamais envoyé (last_executed_date IS NULL)
       // 2. Dernière exécution antérieure à la dernière occurrence planifiée
       // NOTE: lastScheduledOccurrence est maintenant calculée directement en UTC
-      const lastExecutedDateUTC = new Date(sms.last_executed_date);
-      
-      console.log(`   🔍 Debug "${sms.name}": lastExecuted(UTC)=${lastExecutedDateUTC.toISOString()}, lastOccurrence(UTC)=${lastScheduledOccurrence.toISOString()}`);
-      
       const shouldExecute = (
         !sms.last_executed_date || 
-        lastExecutedDateUTC < lastScheduledOccurrence
+        new Date(sms.last_executed_date) < lastScheduledOccurrence
       );
       
       if (shouldExecute) {
