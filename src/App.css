@@ -1,3 +1,53 @@
+/* Variables pour design 'kiddy' inspiré du logo école (arbre coloré) */
+:root {
+  /* Couleurs principales inspirées du logo */
+  --color-primary: #4A9FD7;           /* Bleu de l'arbre */
+  --color-secondary: #7BC142;         /* Vert de l'arbre */
+  --color-accent: #F39C12;            /* Orange chaleureux de l'arbre */
+  --color-pink: #E74C3C;              /* Rose/rouge de l'arbre */
+  --color-purple: #9B59B6;            /* Violet de l'arbre */
+  --color-turquoise: #1ABC9C;         /* Turquoise doux */
+  
+  /* Couleurs de fond organiques */
+  --color-bg-light: #FEFEFE;          /* Fond blanc cassé naturel */
+  --color-bg-card: #FFFFFF;           /* Cartes blanches pures */
+  --color-bg-hover: #F0F9FF;          /* Survol bleu très doux */
+  --color-bg-warm: #FFF8F0;           /* Fond chaud crème */
+  
+  /* Textes harmonieux */
+  --color-text-primary: #2C3E50;      /* Texte principal - gris-bleu foncé */
+  --color-text-secondary: #5A6C7D;    /* Texte secondaire */
+  --color-text-muted: #95A5A6;        /* Texte atténué */
+  --color-text-success: #27AE60;      /* Vert pour succès */
+  
+  /* Design organique et amical */
+  --border-radius: 16px;              /* Plus arrondi = plus amical */
+  --border-radius-small: 8px;
+  --border-radius-large: 24px;
+  --shadow-light: 0 2px 12px rgba(26, 188, 156, 0.08);
+  --shadow-medium: 0 6px 20px rgba(26, 188, 156, 0.12);
+  --shadow-warm: 0 4px 16px rgba(243, 156, 18, 0.1);
+  
+  /* Typographie plus lisible pour parents */
+  --font-family-main: 'Segoe UI', 'Roboto', 'Inter', 'Helvetica Neue', sans-serif;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 600;
+  --font-weight-extra-bold: 700;
+  
+  /* Gradients inspirés du logo */
+  --gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-turquoise) 100%);
+  --gradient-warm: linear-gradient(135deg, var(--color-accent) 0%, var(--color-pink) 100%);
+  --gradient-nature: linear-gradient(135deg, var(--color-secondary) 0%, var(--color-turquoise) 100%);
+}
+
+body {
+  background-color: var(--color-bg-light);
+  font-family: var(--font-family-main);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+}
+
 .planning {
   padding: 20px;
   max-width: 1400px;
@@ -7,6 +57,9 @@
 .planning h1 {
   text-align: center;
   margin-bottom: 30px;
+  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+  font-size: 2.2rem;
 }
 
 .planning-container {

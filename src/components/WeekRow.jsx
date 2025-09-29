@@ -304,11 +304,12 @@ export function WeekRow({ semaine, classes, familles, affectations, allAffectati
         .semaine-affectations {
           display: grid;
           grid-template-columns: repeat(${classes.length}, minmax(150px, 1fr));
-          gap: 1px;
+          gap: 4px;
           flex: 1;
-          background: #ddd;
+          background: var(--color-bg-light);
           overflow-x: auto;
           box-sizing: border-box;
+          padding: 4px;
         }
 
         @media (max-width: 768px) {

@@ -98,10 +98,36 @@ export function Planning() {
     if (currentWeek) {
       const element = document.getElementById(`week-${currentWeek.id}`);
       if (element) {
-        element.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start',
-          inline: 'nearest' 
+        // Calculer l'offset total des éléments sticky
+        const calculateStickyOffset = () => {
+          let offset = 0;
+          
+          // Hauteur du ViewSelector sticky
+          const viewSelector = document.querySelector('.view-selector');
+          if (viewSelector) {
+            offset += viewSelector.offsetHeight;
+          }
+          
+          // Hauteur du StickyClassesHeader s'il est visible
+          const stickyHeader = document.querySelector('.sticky-classes-header');
+          if (stickyHeader && stickyHeader.style.display !== 'none') {
+            offset += stickyHeader.offsetHeight;
+          }
+          
+          // Ajouter une marge de sécurité
+          offset += 16;
+          
+          return offset;
+        };
+
+        const offset = calculateStickyOffset();
+        const elementRect = element.getBoundingClientRect();
+        const absoluteElementTop = elementRect.top + window.pageYOffset;
+        const targetPosition = absoluteElementTop - offset;
+
+        window.scrollTo({
+          top: targetPosition,
+          behavior: 'smooth'
         });
       }
     }
@@ -189,27 +215,41 @@ export function Planning() {
     return (
       <div className="token-form">
         <div className="token-container">
-          <h1>🔒 Accès au Planning</h1>
-          <p>Entrez le token d'accès pour voir le planning :</p>
+          <div className="welcome-header">
+            <div className="welcome-icon">🏫</div>
+            <h1>Bienvenue sur le Planning de Nettoyage</h1>
+            <p className="welcome-subtitle">Consultez facilement les dates d'entretien de votre famille</p>
+          </div>
           
           <form onSubmit={handleTokenSubmit}>
             <div className="input-group">
+              <label htmlFor="token-input">Code d'accès du planning :</label>
               <input
+                id="token-input"
                 type="text"
                 value={tokenInput}
                 onChange={(e) => setTokenInput(e.target.value)}
-                placeholder="Token d'accès (ex: abc123...)"
+                placeholder="Entrez le code reçu par l'école..."
                 required
               />
-              <button type="submit">
-                🔍 Accéder
+              <button type="submit" className="access-button">
+                <span className="button-icon">✨</span>
+                Voir le planning
               </button>
             </div>
           </form>
 
-          <div className="help-text">
-            <p>💡 Si vous êtes administrateur d'un planning, vous avez reçu un lien direct avec le token.</p>
-            <p>📞 Contactez l'administrateur si vous n'avez pas accès.</p>
+          <div className="help-section">
+            <div className="help-card">
+              <div className="help-icon">💌</div>
+              <p><strong>Vous n'avez pas le code ?</strong><br/>
+                 Contactez l'école ou l'association des parents</p>
+            </div>
+            <div className="help-card">
+              <div className="help-icon">👥</div>
+              <p><strong>Première visite ?</strong><br/>
+                 Le planning vous montre quand c'est votre tour</p>
+            </div>
           </div>
         </div>
 
@@ -219,74 +259,158 @@ export function Planning() {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-nature);
             padding: 20px;
           }
 
           .token-container {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
+            background: var(--color-bg-card);
+            padding: 48px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-medium);
+            max-width: 560px;
             width: 100%;
             text-align: center;
           }
 
-          .token-container h1 {
-            margin: 0 0 16px 0;
-            color: #333;
+          .welcome-header {
+            margin-bottom: 32px;
           }
 
-          .token-container p {
-            margin: 0 0 24px 0;
-            color: #666;
+          .welcome-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.9;
+          }
+
+          .token-container h1 {
+            margin: 0 0 12px 0;
+            color: var(--color-text-primary);
+            font-size: 1.8rem;
+            font-weight: var(--font-weight-bold);
+            line-height: 1.3;
+          }
+
+          .welcome-subtitle {
+            margin: 0 0 32px 0;
+            color: var(--color-text-secondary);
+            font-size: 1.1rem;
           }
 
           .input-group {
             display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 32px;
+            text-align: left;
+          }
+
+          .input-group label {
+            font-weight: var(--font-weight-medium);
+            color: var(--color-text-primary);
+            font-size: 1rem;
+            margin-bottom: 8px;
           }
 
           .input-group input {
-            flex: 1;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
+            padding: 16px;
+            border: 2px solid #E0E7FF;
+            border-radius: var(--border-radius-small);
             font-size: 16px;
+            transition: all 0.2s ease;
+            background: #FAFBFF;
           }
 
           .input-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--color-primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
           }
 
-          .input-group button {
-            padding: 12px 24px;
-            background: #667eea;
+          .access-button {
+            padding: 16px 32px;
+            background: var(--color-primary);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: var(--border-radius-small);
             cursor: pointer;
             font-size: 16px;
-            font-weight: 500;
+            font-weight: var(--font-weight-medium);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
           }
 
-          .input-group button:hover {
-            background: #5a6fd8;
+          .access-button:hover {
+            background: #3A7BD5;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
           }
 
-          .help-text {
-            background: #f8f9fa;
-            padding: 16px;
-            border-radius: 6px;
-            text-align: left;
+          .button-icon {
+            font-size: 1.1em;
           }
 
-          .help-text p {
-            margin: 8px 0;
+          .help-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 24px;
+          }
+
+          .help-card {
+            background: #F8FAFF;
+            padding: 20px;
+            border-radius: var(--border-radius-small);
+            text-align: center;
+            border: 1px solid #E0E7FF;
+          }
+
+          .help-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+          }
+
+          .help-card p {
+            margin: 0;
             font-size: 14px;
+            color: var(--color-text-secondary);
+            line-height: 1.4;
+          }
+
+          .help-card strong {
+            color: var(--color-text-primary);
+          }
+
+          @media (max-width: 768px) {
+            .token-container {
+              padding: 32px 24px;
+              margin: 16px;
+            }
+
+            .welcome-icon {
+              font-size: 3rem;
+            }
+
+            .token-container h1 {
+              font-size: 1.5rem;
+            }
+
+            .welcome-subtitle {
+              font-size: 1rem;
+            }
+
+            .help-section {
+              grid-template-columns: 1fr;
+              gap: 12px;
+            }
+
+            .help-card {
+              padding: 16px;
+            }
           }
         `}</style>
       </div>
@@ -366,15 +490,38 @@ export function Planning() {
       )}
       
       <div className="planning">
-      {/* Header avec informations du planning */}
+      {/* Header adaptatif selon le mode */}
       <div className="planning-header">
         <div className="planning-info">
-          <h1>{data.planning?.name || 'Planning de Nettoyage'}</h1>
-          {data.planning?.description && (
-            <p className="planning-description">{data.planning.description}</p>
-          )}
-          {data.planning?.annee_scolaire && (
-            <span className="planning-year">Année {data.planning.annee_scolaire}</span>
+          {!isAdmin ? (
+            /* Vue Parent - Plus chaleureuse */
+            <div className="parent-welcome">
+              <div className="welcome-row">
+                <h1>
+                  <span className="welcome-icon">🏫</span>
+                  {data.planning?.name || 'Planning de l\'École'}
+                </h1>
+              </div>
+              {data.planning?.annee_scolaire && (
+                <div className="school-year">
+                  <span className="year-badge">📅 Année scolaire {data.planning.annee_scolaire}</span>
+                </div>
+              )}
+              <p className="parent-subtitle">
+                Consultez facilement les dates de nettoyage et trouvez quand c'est votre tour !
+              </p>
+            </div>
+          ) : (
+            /* Vue Admin - Plus technique */
+            <div className="admin-header">
+              <h1>{data.planning?.name || 'Planning de Nettoyage'}</h1>
+              {data.planning?.description && (
+                <p className="planning-description">{data.planning.description}</p>
+              )}
+              {data.planning?.annee_scolaire && (
+                <span className="planning-year">Année {data.planning.annee_scolaire}</span>
+              )}
+            </div>
           )}
         </div>
 
@@ -382,9 +529,9 @@ export function Planning() {
           {/* Indicateur de permissions */}
           <div className="permissions-indicator">
             {isAdmin ? (
-              <span className="admin-badge">🔧 Administrateur</span>
+              <span className="admin-badge">🔧 Mode Admin</span>
             ) : (
-              <span className="public-badge">👁️ Lecture seule</span>
+              <span className="public-badge">👀 Vue Parents</span>
             )}
           </div>
 
@@ -393,7 +540,7 @@ export function Planning() {
             onClick={() => setShowAdmin(!showAdmin)}
             className={`admin-toggle ${showAdmin ? 'active' : ''}`}
           >
-            {showAdmin ? '🔧 Masquer Admin' : '⚙️ Administration'}
+            {showAdmin ? '👁️ Vue Simple' : '⚙️ Administration'}
           </button>
         </div>
       </div>
@@ -552,45 +699,103 @@ export function Planning() {
         .planning {
           max-width: 1400px;
           margin: 0 auto;
-          padding: 20px;
-          padding-bottom: 60px; /* Espace en bas pour le scroll naturel */
+          padding: 12px;
+          padding-bottom: 40px; /* Espace en bas pour le scroll naturel */
         }
 
         .planning-header {
           display: flex;
           justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 24px;
-          padding-bottom: 16px;
-          border-bottom: 2px solid #eee;
+          align-items: center;
+          margin-bottom: 16px;
+          padding: 16px 20px;
+          background: var(--color-bg-card);
+          border-radius: var(--border-radius);
+          box-shadow: var(--shadow-light);
+          border: 1px solid rgba(116, 196, 66, 0.1);
         }
 
-        .planning-info h1 {
+        /* Vue Parent - Design chaleureux mais compact */
+        .parent-welcome {
+          max-width: 600px;
+        }
+
+        .welcome-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 6px;
+        }
+
+        .parent-welcome h1 {
+          margin: 0;
+          color: var(--color-text-primary);
+          font-size: 1.4rem;
+          font-weight: var(--font-weight-bold);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .welcome-icon {
+          font-size: 1.6rem;
+          filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .school-year {
+          margin-bottom: 4px;
+        }
+
+        .year-badge {
+          background: var(--gradient-primary);
+          color: white;
+          padding: 4px 12px;
+          border-radius: var(--border-radius-large);
+          font-size: 12px;
+          font-weight: var(--font-weight-medium);
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          box-shadow: var(--shadow-light);
+        }
+
+        .parent-subtitle {
+          margin: 0;
+          color: var(--color-text-secondary);
+          font-size: 0.9rem;
+          line-height: 1.3;
+          font-weight: var(--font-weight-normal);
+        }
+
+        /* Vue Admin - Design plus technique */
+        .admin-header h1 {
           margin: 0 0 8px 0;
-          color: #333;
-          font-size: 28px;
+          color: var(--color-text-primary);
+          font-size: 1.8rem;
+          font-weight: var(--font-weight-bold);
         }
 
         .planning-description {
           margin: 0 0 8px 0;
-          color: #666;
+          color: var(--color-text-secondary);
           font-size: 16px;
         }
 
         .planning-year {
-          background: #e9ecef;
-          padding: 4px 12px;
-          border-radius: 16px;
+          background: var(--color-bg-warm);
+          color: var(--color-text-primary);
+          padding: 6px 14px;
+          border-radius: var(--border-radius-large);
           font-size: 12px;
-          font-weight: 500;
-          color: #495057;
+          font-weight: var(--font-weight-medium);
+          border: 1px solid rgba(243, 156, 18, 0.2);
         }
 
         .planning-controls {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 12px;
+          gap: 16px;
         }
 
         .permissions-indicator {
@@ -598,46 +803,60 @@ export function Planning() {
         }
 
         .admin-badge {
-          background: #d4edda;
-          color: #155724;
-          padding: 6px 12px;
-          border-radius: 16px;
-          font-weight: 500;
+          background: var(--gradient-warm);
+          color: white;
+          padding: 8px 16px;
+          border-radius: var(--border-radius-large);
+          font-weight: var(--font-weight-medium);
+          box-shadow: var(--shadow-light);
+          border: none;
         }
 
         .public-badge {
-          background: #e2e3e5;
-          color: #495057;
-          padding: 6px 12px;
-          border-radius: 16px;
-          font-weight: 500;
+          background: var(--gradient-primary);
+          color: white;
+          padding: 8px 16px;
+          border-radius: var(--border-radius-large);
+          font-weight: var(--font-weight-medium);
+          box-shadow: var(--shadow-light);
+          border: none;
         }
 
         .admin-toggle {
-          padding: 10px 20px;
-          border: 2px solid #007bff;
-          background: white;
-          color: #007bff;
-          border-radius: 6px;
+          padding: 12px 24px;
+          border: 2px solid var(--color-primary);
+          background: var(--color-bg-card);
+          color: var(--color-primary);
+          border-radius: var(--border-radius);
           cursor: pointer;
-          font-weight: 500;
-          transition: all 0.2s;
+          font-weight: var(--font-weight-medium);
+          font-size: 14px;
+          transition: all 0.3s ease;
+          box-shadow: var(--shadow-light);
         }
 
-        .admin-toggle:hover,
-        .admin-toggle.active {
-          background: #007bff;
+        .admin-toggle:hover {
+          background: var(--color-primary);
           color: white;
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-medium);
+        }
+
+        .admin-toggle.active {
+          background: var(--color-primary);
+          color: white;
+          box-shadow: var(--shadow-medium);
         }
 
         .mobile-legend {
           display: flex;
           flex-wrap: wrap;
-          gap: 12px;
-          margin-bottom: 20px;
-          padding: 16px;
-          background: #f8f9fa;
-          border-radius: 8px;
+          gap: 8px;
+          margin-bottom: 12px;
+          padding: 12px;
+          background: var(--color-bg-warm);
+          border-radius: var(--border-radius);
+          border: 1px solid rgba(243, 156, 18, 0.1);
         }
 
         .legend-item {
@@ -768,7 +987,7 @@ export function Planning() {
         }
 
         .planning-grid-wrapper {
-          min-width: ${data.classes?.length ? data.classes.length * 150 + 120 : 720}px;
+          min-width: ${data.classes?.length ? data.classes.length * 150 + 120 + 8 : 728}px;
           width: 100%;
         }
 
@@ -831,7 +1050,7 @@ export function Planning() {
           }
 
           .planning-grid-wrapper {
-            min-width: ${data.classes?.length ? data.classes.length * 120 + 80 : 560}px;
+            min-width: ${data.classes?.length ? data.classes.length * 120 + 80 + 8 : 568}px;
           }
 
           .classes-indicator {
@@ -862,7 +1081,7 @@ export function Planning() {
           }
 
           .planning-grid-wrapper {
-            min-width: ${data.classes?.length ? data.classes.length * 100 + 60 : 460}px;
+            min-width: ${data.classes?.length ? data.classes.length * 100 + 60 + 8 : 468}px;
           }
 
           .scroll-hint {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useDrag, useDrop } from 'react-dnd';
 import { AddToCalendarIcon } from './AddToCalendarButton';
@@ -6,6 +6,8 @@ import { AddToCalendarIcon } from './AddToCalendarButton';
 export function AffectationCell({ classe, semaine, affectation, realAffectation, onMove, onFamilleDrop, onOverwriteRequest, isAdmin, famille, filters }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [isTextTruncated, setIsTextTruncated] = useState(false);
+  const familleNomRef = useRef(null);
 
   // Vérifier si l'affectation correspond aux préférences de la famille
   const isPreferredClass = () => {
@@ -46,6 +48,15 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
 
   const isOutOfPreference = isAdmin && affectation && !isPreferredClass();
   const hasExclusionViolation = isAdmin && affectation && violatesExclusion();
+
+  // Fonction pour vérifier si le texte est tronqué
+  useEffect(() => {
+    if (familleNomRef.current) {
+      const element = familleNomRef.current;
+      const isTruncated = element.scrollWidth > element.clientWidth;
+      setIsTextTruncated(isTruncated);
+    }
+  }, [affectation?.familleNom]);
 
   const [{ isDragging }, drag] = useDrag(() => ({
     type: 'affectation',
@@ -129,14 +140,17 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
         <>
           <div className="affectation-content">
             <div 
+              ref={familleNomRef}
               className="famille-nom"
               onMouseEnter={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setTooltipPosition({
-                  x: rect.left + rect.width / 2,
-                  y: rect.top - 10
-                });
-                setShowTooltip(true);
+                if (isTextTruncated) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setTooltipPosition({
+                    x: rect.left + rect.width / 2,
+                    y: rect.top - 10
+                  });
+                  setShowTooltip(true);
+                }
               }}
               onMouseLeave={() => {
                 setShowTooltip(false);
@@ -167,71 +181,34 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
             </div>
           </div>
           
-          {/* Tooltip via Portal */}
-          {showTooltip && ReactDOM.createPortal(
-            <div 
-              className="famille-nom-tooltip-portal" 
-              style={{
-                position: 'fixed',
-                left: `${tooltipPosition.x}px`,
-                top: `${tooltipPosition.y}px`,
-                transform: 'translateX(-50%)',
-                zIndex: 10000,
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
-                color: '#333',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                fontSize: '12px',
-                whiteSpace: 'nowrap',
-                minWidth: '200px',
-                textAlign: 'center',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1)',
-                border: '1px solid #e0e0e0',
-                pointerEvents: 'none',
-                backdropFilter: 'blur(8px)'
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: '6px', fontSize: '13px', color: '#2c3e50' }}>
-                {affectation.familleNom || 'Famille inconnue'}
-              </div>
-              {isAdmin && famille && famille.classes_preferences && famille.classes_preferences.length > 0 && (
-                <div style={{ marginTop: '6px', fontSize: '11px', color: '#6c757d' }}>
-                  <strong style={{ color: '#495057' }}>Préférences :</strong> {famille.classes_preferences.join(', ')}
-                  {isOutOfPreference && (
-                    <div style={{ color: '#e67e22', fontWeight: 600, marginTop: '4px' }}>⚠️ Hors préférences</div>
-                  )}
-                </div>
-              )}
-              {isAdmin && famille && (!famille.classes_preferences || famille.classes_preferences.length === 0) && (
-                <div style={{ fontStyle: 'italic', color: '#adb5bd', fontSize: '11px' }}>Aucune préférence définie</div>
-              )}
-              {isAdmin && hasExclusionViolation && famille && famille.exclusions && (
-                <div style={{ marginTop: '6px', fontSize: '11px', color: '#dc3545' }}>
-                  <strong style={{ color: '#c62828' }}>🚫 Exclusion temporelle :</strong>
-                  {famille.exclusions
-                    .filter(exclusion => {
-                      const exclusionStart = new Date(exclusion.date_debut);
-                      const exclusionEnd = new Date(exclusion.date_fin);
-                      const semaineStart = new Date(semaine.debut);
-                      const semaineEnd = new Date(semaine.fin);
-                      return (
-                        (exclusionStart <= semaineStart && exclusionEnd >= semaineStart) ||
-                        (exclusionStart <= semaineEnd && exclusionEnd >= semaineEnd) ||
-                        (exclusionStart >= semaineStart && exclusionEnd <= semaineEnd)
-                      );
-                    })
-                    .map((exclusion, index) => (
-                      <div key={index} style={{ marginTop: '2px', fontSize: '10px' }}>
-                        {new Date(exclusion.date_debut).toLocaleDateString()} - {new Date(exclusion.date_fin).toLocaleDateString()}
-                        {exclusion.type && ` (${exclusion.type})`}
-                      </div>
-                    ))
-                  }
-                </div>
-              )}
-            </div>,
-            document.body
-          )}
+           {/* Tooltip simple pour nom tronqué */}
+           {showTooltip && isTextTruncated && ReactDOM.createPortal(
+             <div 
+               className="famille-nom-tooltip-portal" 
+               style={{
+                 position: 'fixed',
+                 left: `${tooltipPosition.x}px`,
+                 top: `${tooltipPosition.y}px`,
+                 transform: 'translateX(-50%)',
+                 zIndex: 10000,
+                 background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%)',
+                 color: 'white',
+                 padding: '6px 10px',
+                 borderRadius: 'var(--border-radius-small)',
+                 fontSize: '12px',
+                 whiteSpace: 'nowrap',
+                 textAlign: 'center',
+                 boxShadow: 'var(--shadow-medium)',
+                 border: '1px solid rgba(255, 255, 255, 0.2)',
+                 pointerEvents: 'none',
+                 fontWeight: 'var(--font-weight-medium)',
+                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
+               }}
+             >
+               {affectation.familleNom || 'Famille inconnue'}
+             </div>,
+             document.body
+           )}
         </>
       )}
       
@@ -255,36 +232,49 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           min-height: 80px;
           position: relative;
           min-width: 150px;
-          background: white;
-          border: none;
-          border-radius: 0;
-          padding: 6px;
-          position: relative;
+          background: var(--color-bg-card);
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          border-radius: var(--border-radius);
+          padding: 8px;
+          margin: 0;
           display: flex;
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          transition: all 0.2s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           cursor: ${isAdmin && affectation ? 'grab' : 'default'};
           box-sizing: border-box;
           overflow: visible;
+          box-shadow: var(--shadow-light);
+        }
+
+        .affectation-cell:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-medium);
+          border-color: rgba(116, 196, 66, 0.2);
         }
 
         .affectation-cell.droppable {
-          border: 2px dashed #007bff;
-          background: rgba(0, 123, 255, 0.1);
+          border: 2px dashed var(--color-primary);
+          background: rgba(74, 159, 215, 0.08);
+          box-shadow: var(--shadow-light);
+          transform: translateY(-1px);
         }
 
         .affectation-cell.drop-target {
-          border: 2px solid #28a745 !important;
-          background-color: rgba(40, 167, 69, 0.1) !important;
-          transform: scale(1.02);
-          transition: all 0.2s ease;
+          border: 2px solid var(--color-secondary) !important;
+          background: rgba(124, 196, 66, 0.08) !important;
+          transform: translateY(-3px) scale(1.02);
+          box-shadow: 0 8px 25px rgba(124, 196, 66, 0.2) !important;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .affectation-cell.dragging {
-          transform: rotate(5deg);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+          transform: translateY(-4px) rotate(3deg);
+          box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+          opacity: 0.95;
+          z-index: 1000;
+          border-color: var(--color-accent);
         }
 
         .famille-nom {
@@ -302,21 +292,22 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
 
         .famille-nom-tooltip {
           position: absolute;
-          top: -80px;
+          top: -70px;
           left: 50%;
           transform: translateX(-50%);
-          background: rgba(0, 0, 0, 0.95);
+          background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
           color: white;
-          padding: 10px 14px;
-          border-radius: 8px;
-          font-size: 12px;
+          padding: 8px 12px;
+          border-radius: var(--border-radius);
+          font-size: 11px;
           white-space: nowrap;
           z-index: 1000;
-          min-width: 200px;
+          max-width: 180px;
           text-align: center;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: var(--shadow-medium);
+          border: 1px solid rgba(255, 255, 255, 0.2);
           pointer-events: none;
+          backdrop-filter: blur(8px);
         }
 
         .famille-nom-tooltip::after {
@@ -325,44 +316,36 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           top: 100%;
           left: 50%;
           transform: translateX(-50%);
-          border: 6px solid transparent;
-          border-top-color: rgba(0, 0, 0, 0.95);
+          border: 5px solid transparent;
+          border-top-color: var(--color-primary);
         }
 
         .tooltip-famille {
-          font-weight: 600;
-          margin-bottom: 6px;
-          font-size: 13px;
+          font-weight: var(--font-weight-bold);
+          margin-bottom: 4px;
+          font-size: 12px;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
         .tooltip-preferences {
-          margin-top: 6px;
-          font-size: 11px;
-          opacity: 0.9;
-        }
-
-        .tooltip-warning {
-          color: #ff9800;
-          font-weight: 600;
           margin-top: 4px;
-        }
-
-        .tooltip-no-prefs {
-          font-style: italic;
-          opacity: 0.7;
-          font-size: 11px;
+          font-size: 10px;
+          opacity: 0.95;
+          line-height: 1.3;
         }
 
         .tooltip-warning {
-          color: #ffab91;
-          font-weight: 600;
-          margin-top: 2px;
+          color: #FFE082;
+          font-weight: var(--font-weight-medium);
+          margin-top: 3px;
+          font-size: 10px;
         }
 
         .tooltip-no-prefs {
-          font-size: 10px;
-          color: #bdbdbd;
           font-style: italic;
+          opacity: 0.8;
+          font-size: 10px;
+          color: rgba(255, 255, 255, 0.7);
         }
 
         .affectation-content {
@@ -378,9 +361,24 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
         }
 
         .nettoyage-numero {
-          font-size: 10px;
-          color: #666;
-          font-weight: 500;
+          font-size: 11px;
+          color: white;
+          font-weight: var(--font-weight-medium);
+          background: linear-gradient(135deg, rgba(74, 159, 215, 0.7) 0%, rgba(26, 188, 156, 0.7) 100%);
+          padding: 4px 8px;
+          border-radius: var(--border-radius-large);
+          margin-left: 6px;
+          white-space: nowrap;
+          flex-shrink: 0;
+          box-shadow: 0 2px 8px rgba(74, 159, 215, 0.2);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          min-width: 24px;
+          text-align: center;
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
 
         .calendar-actions {
@@ -508,7 +506,9 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           }
           
           .nettoyage-numero {
-            font-size: 8px;
+            font-size: 9px;
+            padding: 3px 6px;
+            min-width: 20px;
           }
 
 
@@ -531,7 +531,9 @@ export function AffectationCell({ classe, semaine, affectation, realAffectation,
           }
           
           .nettoyage-numero {
-            font-size: 7px;
+            font-size: 8px;
+            padding: 2px 5px;
+            min-width: 18px;
           }
 
           .drop-placeholder {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+
 export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollapsed }) {
   const [isVisible, setIsVisible] = useState(false);
   const [gridPosition, setGridPosition] = useState({ left: 0, width: 0 });
@@ -40,33 +41,39 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
   useEffect(() => {
     if (!originalHeaderRef.current) return;
 
-    let headerIntersecting = true;
     let gridIntersecting = false;
 
     const checkVisibility = () => {
-      // Afficher sticky seulement si l'en-tête original n'est pas visible ET la grille est visible
-      const shouldShow = !headerIntersecting && gridIntersecting;
+      if (!originalHeaderRef.current) return;
+
+      // Calculer les positions précises
+      const viewSelector = document.querySelector('.view-selector');
+      const originalHeader = originalHeaderRef.current;
       
-      setIsVisible(shouldShow);
-      if (shouldShow) {
-        updateGridPosition();
+      if (!viewSelector || !originalHeader) return;
+
+      const viewSelectorRect = viewSelector.getBoundingClientRect();
+      const originalHeaderRect = originalHeader.getBoundingClientRect();
+      
+      // Le sticky header doit apparaître quand l'en-tête original
+      // passe sous le ViewSelector sticky (position top = viewSelectorHeight)
+      const viewSelectorBottom = viewSelectorRect.bottom;
+      const originalHeaderTop = originalHeaderRect.top;
+      
+      // Afficher le sticky si l'en-tête original est caché par le ViewSelector
+      // ET si la grille est visible
+      const headerHiddenBySticky = originalHeaderTop <= viewSelectorBottom;
+      const shouldShow = headerHiddenBySticky && gridIntersecting;
+      
+      if (shouldShow !== isVisible) {
+        setIsVisible(shouldShow);
+        if (shouldShow) {
+          updateGridPosition();
+        }
       }
     };
 
-    // Observer pour l'en-tête original
-    const headerObserver = new IntersectionObserver(
-      ([entry]) => {
-        headerIntersecting = entry.isIntersecting;
-        checkVisibility();
-      },
-      {
-        root: null,
-        rootMargin: '-80px 0px 0px 0px',
-        threshold: 0
-      }
-    );
-
-    // Observer pour la grille de planning
+    // Observer pour la grille de planning (pour s'assurer qu'elle est visible)
     const gridContainer = originalHeaderRef.current.closest('.planning-container')?.querySelector('.planning-grid-wrapper');
     let gridObserver = null;
     
@@ -85,7 +92,10 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
       gridObserver.observe(gridContainer);
     }
 
-    headerObserver.observe(originalHeaderRef.current);
+    // Écouter le scroll pour vérification en temps réel
+    const handleScroll = () => {
+      checkVisibility();
+    };
 
     // Écouter le scroll horizontal et repositionner l'en-tête sticky
     const scrollContainer = originalHeaderRef.current.closest('.planning-scroll-container');
@@ -101,23 +111,29 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
       scrollContainer.addEventListener('scroll', syncPosition, { passive: true });
     }
 
+    // Écouter le scroll vertical global
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
     // Écouter le resize de la fenêtre
-    window.addEventListener('resize', updateGridPosition);
+    window.addEventListener('resize', () => {
+      updateGridPosition();
+      checkVisibility();
+    });
 
-    // Mise à jour initiale
-    updateGridPosition();
+    // Vérification initiale
+    setTimeout(checkVisibility, 100); // Petit délai pour s'assurer que tout est rendu
 
     return () => {
-      headerObserver.disconnect();
       if (gridObserver) {
         gridObserver.disconnect();
       }
       if (scrollContainer) {
         scrollContainer.removeEventListener('scroll', syncPosition);
       }
+      window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', updateGridPosition);
     };
-  }, [originalHeaderRef, sidebarCollapsed]);
+  }, [originalHeaderRef, sidebarCollapsed, isVisible]);
 
   // Mise à jour supplémentaire quand la sidebar change (avec délai pour la transition)
   useEffect(() => {
@@ -166,7 +182,7 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
                     className="pdf-instructions"
                     title="Instructions de nettoyage (PDF)"
                   >
-                    📄
+                    📋
                   </a>
                 )}
               </div>
@@ -178,15 +194,16 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
       <style jsx>{`
         .sticky-classes-header {
           position: fixed;
-          top: 64px; /* Sous le ViewSelector - compense ses 16px de margin-bottom */
+          top: var(--view-selector-height, 80px); /* Position dynamique sous le ViewSelector sticky */
           left: ${gridPosition.left}px; /* Position du conteneur de scroll */
           width: ${gridPosition.width}px; /* Largeur du conteneur visible */
-          z-index: 70;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          background: white;
-          backdrop-filter: blur(8px);
+          z-index: 65;
+          box-shadow: 0 2px 8px rgba(116, 196, 66, 0.15);
+          background: var(--color-bg-card);
+          backdrop-filter: blur(12px);
           animation: slideDown 0.3s ease-out;
           overflow: hidden; /* Masquer les parties qui dépassent */
+          border-bottom: 2px solid rgba(116, 196, 66, 0.2);
         }
         
         .sticky-classes-wrapper {
@@ -209,18 +226,19 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
         .classes-header-grid {
           display: grid;
           grid-template-columns: repeat(${classes.length}, 1fr);
-          gap: 1px;
-          background: #ddd;
+          gap: 2px;
+          background: var(--color-bg-light);
           width: 100%; /* Prend toute la largeur du wrapper */
           box-sizing: border-box;
+          padding: 2px;
         }
 
         .classe-header {
-          padding: 8px 4px;
-          color: white;
-          font-weight: 600;
+          padding: 8px 6px;
+          color: var(--color-text-primary);
+          font-weight: var(--font-weight-medium);
           text-align: center;
-          min-height: 70px;
+          min-height: 60px;
           min-width: 150px;
           display: flex;
           flex-direction: column;
@@ -229,25 +247,31 @@ export function StickyClassesHeader({ classes, originalHeaderRef, sidebarCollaps
           gap: 4px;
           position: relative;
           box-sizing: border-box;
-          text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+          border-radius: var(--border-radius-small);
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          margin: 2px;
         }
+
 
         .classe-nom {
           line-height: 1.2;
           word-wrap: break-word;
           hyphens: auto;
+          font-size: 12px;
+          font-weight: var(--font-weight-bold);
         }
 
         .classe-description {
           font-size: 9px;
-          line-height: 1.2;
-          color: rgba(255, 255, 255, 0.8);
+          line-height: 1.1;
+          color: var(--color-text-secondary);
           text-align: center;
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 100%;
-          margin-top: 2px;
-          font-weight: 400;
+          margin-top: 1px;
+          font-weight: var(--font-weight-normal);
         }
 
         .pdf-instructions {

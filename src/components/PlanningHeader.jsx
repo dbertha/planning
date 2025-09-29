@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 
+
 export const PlanningHeader = forwardRef(({ classes }, ref) => {
   return (
     <>
@@ -25,7 +26,7 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
                   className="pdf-instructions"
                   title="Instructions de nettoyage (PDF)"
                 >
-                  📄
+                  📋
                 </a>
               )}
             </div>
@@ -35,24 +36,27 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
 
       <style jsx>{`
         .classes-header {
-          background: white;
+          background: var(--color-bg-card);
+          border-radius: var(--border-radius-small) var(--border-radius-small) 0 0;
+          overflow: hidden;
         }
         
         .classes-header-grid {
           display: grid;
           grid-template-columns: repeat(${classes.length}, 1fr);
-          gap: 1px;
-          background: #ddd;
+          gap: 2px;
+          background: var(--color-bg-light);
           width: 100%;
           box-sizing: border-box;
+          padding: 2px;
         }
 
         .classe-header {
-          padding: 8px 4px;
-          color: #333;
-          font-weight: 600;
+          padding: 8px 6px;
+          color: var(--color-text-primary);
+          font-weight: var(--font-weight-medium);
           text-align: center;
-          min-height: 70px;
+          min-height: 60px;
           min-width: 150px;
           display: flex;
           flex-direction: column;
@@ -63,57 +67,84 @@ export const PlanningHeader = forwardRef(({ classes }, ref) => {
           white-space: nowrap;
           overflow: hidden;
           box-sizing: border-box;
+          border-radius: var(--border-radius-small);
+          transition: all 0.2s ease;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
         }
+
+        .classe-header:hover {
+          transform: translateY(-2px);
+          box-shadow: var(--shadow-light);
+        }
+
 
         .classe-nom {
           display: flex;
           align-items: center;
           justify-content: center;
           font-size: 12px;
-          line-height: 1.3;
+          line-height: 1.2;
           text-align: center;
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 100%;
+          font-weight: var(--font-weight-bold);
         }
 
         .classe-description {
           font-size: 9px;
-          line-height: 1.2;
-          color: rgba(51, 51, 51, 0.8);
+          line-height: 1.1;
+          color: var(--color-text-secondary);
           text-align: center;
           overflow: hidden;
           text-overflow: ellipsis;
           max-width: 100%;
-          margin-top: 2px;
-          font-weight: 400;
+          margin-top: 1px;
+          font-weight: var(--font-weight-normal);
         }
 
         .pdf-instructions {
-          color: #333;
+          color: var(--color-text-primary);
           text-decoration: none;
           font-size: 16px;
           opacity: 0.8;
-          transition: all 0.2s;
-          padding: 2px 4px;
-          border-radius: 3px;
+          transition: all 0.2s ease;
+          padding: 4px;
+          border-radius: var(--border-radius-small);
+          position: absolute;
+          top: 4px;
+          right: 4px;
         }
 
         .pdf-instructions:hover {
           opacity: 1;
-          background: rgba(255, 255, 255, 0.2);
-          transform: scale(1.1);
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.15);
         }
 
         @media (max-width: 768px) {
           .classe-header {
-            padding: 8px;
-            min-height: 50px;
+            padding: 10px 6px;
+            min-height: 60px;
             font-size: 12px;
+            gap: 4px;
+          }
+
+
+          .classe-nom {
+            font-size: 11px;
+          }
+
+          .classe-description {
+            font-size: 9px;
           }
           
           .pdf-instructions {
             font-size: 14px;
+            top: 2px;
+            right: 2px;
+            padding: 2px;
           }
         }
       `}</style>
