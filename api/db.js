@@ -1032,6 +1032,7 @@ export const getScheduledSMSToExecute = async () => {
           scheduledTodayUTC.setUTCHours(sms.hour - offsetHours, sms.minute, 0, 0);
           
           // Si déjà exécuté après l'heure planifiée d'aujourd'hui, ne pas ré-exécuter
+          console.log(`   🔍 Comparaison: lastExecuted=${lastExecutedUTC.toISOString()}, scheduledToday=${scheduledTodayUTC.toISOString()}, lastExecuted >= scheduled = ${lastExecutedUTC >= scheduledTodayUTC}`);
           if (lastExecutedUTC >= scheduledTodayUTC) {
             console.log(`   ⏭️ "${sms.name}" - déjà exécuté aujourd'hui (${lastExecutedUTC.toISOString()} >= ${scheduledTodayUTC.toISOString()})`);
             continue;
