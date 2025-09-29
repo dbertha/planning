@@ -1026,9 +1026,13 @@ export const getScheduledSMSToExecute = async () => {
           const lastExecutedUTC = new Date(sms.last_executed_date);
           const nowUTC_copy = new Date(nowUTC);
           
-          // Créer l'heure planifiée en UTC pour aujourd'hui
-          const offsetHours = nowBrussels.getTimezoneOffset() === -120 ? 2 : 1; // CEST = UTC+2, CET = UTC+1
+          // Créer l'heure planifiée en UTC pour aujourd'hui  
+          // CORRECTION: Utiliser l'offset de Bruxelles calculé depuis nowBrussels
           const scheduledTodayUTC = new Date(nowUTC_copy);
+          // Pour CEST (été): 21h CEST = 19h UTC, donc UTC = CEST - 2
+          // Pour CET (hiver): 21h CET = 20h UTC, donc UTC = CET - 1
+          const brusselsOffsetMinutes = nowBrussels.getTimezoneOffset(); // -120 pour CEST, -60 pour CET
+          const offsetHours = Math.abs(brusselsOffsetMinutes) / 60; // 2 pour CEST, 1 pour CET
           scheduledTodayUTC.setUTCHours(sms.hour - offsetHours, sms.minute, 0, 0);
           
           // Si déjà exécuté après l'heure planifiée d'aujourd'hui, ne pas ré-exécuter
