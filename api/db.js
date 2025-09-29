@@ -1011,15 +1011,32 @@ export const getScheduledSMSToExecute = async () => {
     const smsToExecute = [];
     
     for (const sms of allSMS.rows) {
-      // Vérifier si le SMS est programmé maintenant (avec tolérance de 5 minutes)
+      // Vérifier si le SMS est programmé maintenant (avec tolérance de 20 minutes pour cron toutes les 15min)
       const isScheduledNow = (
         sms.day_of_week === currentDayOfWeek && 
         sms.hour === currentHour && 
-        sms.minute >= Math.max(0, currentMinute - 5) && 
+        sms.minute >= Math.max(0, currentMinute - 20) && 
         sms.minute <= currentMinute
       );
       
       if (isScheduledNow) {
+        // IMPORTANT: Vérifier si le SMS a déjà été exécuté récemment pour éviter les doublons
+        if (sms.last_executed_date) {
+          const lastExecutedUTC = new Date(sms.last_executed_date);
+          const nowUTC_copy = new Date(nowUTC);
+          
+          // Créer l'heure planifiée en UTC pour aujourd'hui
+          const offsetHours = nowBrussels.getTimezoneOffset() === -120 ? 2 : 1; // CEST = UTC+2, CET = UTC+1
+          const scheduledTodayUTC = new Date(nowUTC_copy);
+          scheduledTodayUTC.setUTCHours(sms.hour - offsetHours, sms.minute, 0, 0);
+          
+          // Si déjà exécuté après l'heure planifiée d'aujourd'hui, ne pas ré-exécuter
+          if (lastExecutedUTC >= scheduledTodayUTC) {
+            console.log(`   ⏭️ "${sms.name}" - déjà exécuté aujourd'hui (${lastExecutedUTC.toISOString()} >= ${scheduledTodayUTC.toISOString()})`);
+            continue;
+          }
+        }
+        
         smsToExecute.push(sms);
         console.log(`   • "${sms.name}" - programmé maintenant`);
         continue;
