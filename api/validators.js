@@ -5,7 +5,7 @@
 import { classesQueries } from './queries.js';
 
 /**
- * Validation du numéro de téléphone
+ * Validation du numéro de téléphone avec support des numéros européens
  */
 export function validatePhoneNumber(phone, required = true) {
   if (!phone || phone.trim() === '') {
@@ -15,10 +15,61 @@ export function validatePhoneNumber(phone, required = true) {
     return true;
   }
   
-  // Validation basique du format
+  // Nettoyer le numéro (garder seulement chiffres et +)
   const cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Validation de longueur minimale
   if (cleaned.length < 8) {
     throw new Error('Numéro de téléphone trop court');
+  }
+  
+  // Validation de longueur maximale (15 chiffres max selon E.164)
+  if (cleaned.replace(/\+/, '').length > 15) {
+    throw new Error('Numéro de téléphone trop long');
+  }
+  
+  // Validation des indicatifs européens courants
+  const europeanCountryCodes = [
+    '32',   // Belgique
+    '33',   // France  
+    '49',   // Allemagne
+    '31',   // Pays-Bas
+    '41',   // Suisse
+    '43',   // Autriche
+    '39',   // Italie
+    '34',   // Espagne
+    '44',   // Royaume-Uni
+    '351',  // Portugal
+    '352',  // Luxembourg
+    '45',   // Danemark
+    '46',   // Suède
+    '47',   // Norvège
+    '358',  // Finlande
+    '420',  // République tchèque
+    '48',   // Pologne
+  ];
+  
+  // Si le numéro commence par +, vérifier l'indicatif
+  if (cleaned.startsWith('+')) {
+    const numberWithoutPlus = cleaned.substring(1);
+    const isValidEuropean = europeanCountryCodes.some(code => 
+      numberWithoutPlus.startsWith(code)
+    );
+    
+    if (!isValidEuropean) {
+      console.warn(`Numéro avec indicatif non-européen détecté: ${phone}`);
+      // Ne pas rejeter, juste avertir - permet d'autres pays
+    }
+  }
+  // Si le numéro ne commence pas par +, vérifier s'il pourrait être un indicatif européen
+  else {
+    const isValidEuropean = europeanCountryCodes.some(code => 
+      cleaned.startsWith(code)
+    );
+    
+    if (!isValidEuropean && !cleaned.startsWith('0')) {
+      console.warn(`Numéro sans indicatif reconnu: ${phone} - sera traité comme belge par défaut`);
+    }
   }
   
   return true;

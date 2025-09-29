@@ -439,13 +439,43 @@ class TwilioSMSService extends BaseSMSService {
   }
 
   /**
-   * Normaliser un numéro de téléphone pour Twilio (format E.164)
+   * Normaliser un numéro de téléphone pour Twilio (format E.164) avec support européen
    */
   normalizePhoneNumber(phone) {
     if (!phone) throw new Error('Numéro de téléphone manquant');
     
     // Retirer tous les espaces et caractères non-numériques sauf +
     let cleaned = phone.replace(/[^\d+]/g, '');
+    
+    // Si déjà au format E.164 avec +
+    if (cleaned.startsWith('+')) {
+      return cleaned;
+    }
+    
+    // Indicatifs européens courants avec longueurs valides
+    const europeanCountryCodes = [
+      { code: '32', length: [9] },      // Belgique
+      { code: '33', length: [9] },      // France  
+      { code: '49', length: [10, 11, 12] }, // Allemagne
+      { code: '31', length: [9] },      // Pays-Bas
+      { code: '41', length: [9] },      // Suisse
+      { code: '43', length: [10, 11] }, // Autriche
+      { code: '39', length: [9, 10] },  // Italie
+      { code: '34', length: [9] },      // Espagne
+      { code: '44', length: [10] },     // Royaume-Uni
+      { code: '351', length: [9] },     // Portugal
+      { code: '352', length: [8, 9] },  // Luxembourg
+    ];
+    
+    // Vérifier si c'est un indicatif européen direct
+    for (const country of europeanCountryCodes) {
+      if (cleaned.startsWith(country.code)) {
+        const remainingDigits = cleaned.substring(country.code.length);
+        if (country.length.includes(remainingDigits.length)) {
+          return '+' + cleaned;
+        }
+      }
+    }
     
     // Si commence par 0032, remplacer par +32
     if (cleaned.startsWith('0032')) {
@@ -455,13 +485,17 @@ class TwilioSMSService extends BaseSMSService {
     else if (cleaned.startsWith('00')) {
       cleaned = '+' + cleaned.substring(2);
     }
-    // Si ne commence pas par +, ajouter +32 (Belgique par défaut)
-    else if (!cleaned.startsWith('+')) {
-      if (cleaned.startsWith('0')) {
-        cleaned = '+32' + cleaned.substring(1);
-      } else {
-        cleaned = '+32' + cleaned;
-      }
+    // Si commence par 0, supposer belge
+    else if (cleaned.startsWith('0')) {
+      cleaned = '+32' + cleaned.substring(1);
+    }
+    // Si 9 chiffres sans préfixe, supposer belge
+    else if (cleaned.length === 9) {
+      cleaned = '+32' + cleaned;
+    }
+    // Sinon, ajouter +32 par défaut
+    else {
+      cleaned = '+32' + cleaned;
     }
     
     return cleaned;
@@ -567,7 +601,7 @@ class SMSFactorSMSService extends BaseSMSService {
   }
 
   /**
-   * Normaliser un numéro de téléphone pour SMSFactor (format international sans +)
+   * Normaliser un numéro de téléphone pour SMSFactor (format international sans +) avec support européen
    */
   normalizePhoneNumber(phone) {
     if (!phone) throw new Error('Numéro de téléphone manquant');
@@ -575,25 +609,55 @@ class SMSFactorSMSService extends BaseSMSService {
     // Retirer tous les espaces et caractères non-numériques sauf +
     let cleaned = phone.replace(/[^\d+]/g, '');
     
+    // Si commence par +, le retirer (SMSFactor veut sans +)
+    if (cleaned.startsWith('+')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // Indicatifs européens courants avec longueurs valides
+    const europeanCountryCodes = [
+      { code: '32', length: [9] },      // Belgique
+      { code: '33', length: [9] },      // France  
+      { code: '49', length: [10, 11, 12] }, // Allemagne
+      { code: '31', length: [9] },      // Pays-Bas
+      { code: '41', length: [9] },      // Suisse
+      { code: '43', length: [10, 11] }, // Autriche
+      { code: '39', length: [9, 10] },  // Italie
+      { code: '34', length: [9] },      // Espagne
+      { code: '44', length: [10] },     // Royaume-Uni
+      { code: '351', length: [9] },     // Portugal
+      { code: '352', length: [8, 9] },  // Luxembourg
+    ];
+    
+    // Vérifier si c'est déjà un indicatif européen direct
+    for (const country of europeanCountryCodes) {
+      if (cleaned.startsWith(country.code)) {
+        const remainingDigits = cleaned.substring(country.code.length);
+        if (country.length.includes(remainingDigits.length)) {
+          return cleaned; // Déjà au bon format pour SMSFactor
+        }
+      }
+    }
+    
     // Si commence par 0032, remplacer par 32
     if (cleaned.startsWith('0032')) {
       cleaned = '32' + cleaned.substring(4);
     }
-    // Si commence par +, le retirer
-    else if (cleaned.startsWith('+')) {
-      cleaned = cleaned.substring(1);
-    }
-    // Si commence par 00, remplacer par rien
+    // Si commence par 00, enlever les 00
     else if (cleaned.startsWith('00')) {
       cleaned = cleaned.substring(2);
     }
-    // Si ne commence pas par un indicatif international, ajouter 32 (Belgique par défaut)
-    else if (!cleaned.startsWith('32') && !cleaned.startsWith('33') && !cleaned.startsWith('1')) {
-      if (cleaned.startsWith('0')) {
-        cleaned = '32' + cleaned.substring(1);
-      } else {
-        cleaned = '32' + cleaned;
-      }
+    // Si commence par 0, supposer belge
+    else if (cleaned.startsWith('0')) {
+      cleaned = '32' + cleaned.substring(1);
+    }
+    // Si 9 chiffres sans préfixe, supposer belge
+    else if (cleaned.length === 9) {
+      cleaned = '32' + cleaned;
+    }
+    // Sinon, ajouter 32 par défaut
+    else {
+      cleaned = '32' + cleaned;
     }
     
     return cleaned;

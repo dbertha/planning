@@ -506,7 +506,7 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
       classesCountRes
     ] = await Promise.all([
       query('SELECT id, debut, fin FROM semaines WHERE id = $1 AND planning_id = $2', [semaineId, planningId]),
-      query('SELECT id, nom, ordre FROM classes WHERE planning_id = $1 ORDER BY ordre, id', [planningId]),
+      query('SELECT id, nom, ordre, description FROM classes WHERE planning_id = $1 ORDER BY ordre, id', [planningId]),
       // Classes déjà occupées cette semaine
       query('SELECT classe_id FROM affectations WHERE semaine_id = $1 AND planning_id = $2', [semaineId, planningId]),
       // Familles déjà assignées cette semaine
@@ -577,8 +577,19 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
 
     // 2. Classes disponibles pour cette semaine
     const availableClasses = classes
-      .map(r => ({ id: r.id.toString(), nom: r.nom }))
+      .map(r => ({ id: r.id.toString(), nom: r.nom, description: r.description || '' }))
       .filter(c => !occupiedClasses.has(c.id));
+
+    // Détection des "espaces communs" (préférences universelles)
+    const commonClasses = new Set(
+      availableClasses
+        .filter(c => {
+          const n = (c.nom || '').toLowerCase();
+          const d = (c.description || '').toLowerCase();
+          return n.includes('commun') || n.includes('espace') || d.includes('commun') || d.includes('espace');
+        })
+        .map(c => c.id)
+    );
 
     if (availableClasses.length === 0) {
       return {
@@ -593,7 +604,7 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
 
     const S = availableClasses.length; // nombre de créneaux (classes) à assigner
 
-    // 3. Filtrage des candidats par créneau (contraintes strictes)
+    // 3. Filtrage des candidats par créneau (contraintes strictes sauf préférences)
     const candidatesPerSlot = new Array(S);
     const candidateSet = new Set();
 
@@ -604,9 +615,9 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
       for (const f of families) {
         // Contraintes strictes:
         if (occupiedFamilies.has(f.famille_id)) continue;         // déjà assignée cette semaine
-        if (!f.classes_pref.has(clsId)) continue;                // doit avoir cette classe en préférence
-        if (f.current_assignments >= f.nb_nettoyage) continue;   // quota déjà atteint
-        
+        if (f.current_assignments >= f.nb_nettoyage) continue;    // quota déjà atteint
+
+        // Préférences désormais traitées via un coût (soft constraint)
         arr.push(f.famille_id);
         candidateSet.add(f.famille_id);
       }
@@ -642,7 +653,8 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
     const famIndex = new Map(candidateFamilies.map((id, i) => [id, i]));
     const matrix = Array.from({ length: n }, () => Array(n).fill(LARGE_COST));
 
-    // Remplissage de la matrice avec les coûts d'équité temporelle
+    // Remplissage de la matrice avec les coûts d'équité temporelle + pénalité de préférence
+    const PREFERENCE_PENALTY = 10; // pénalité si la classe n'est pas dans les préférences (hors espaces communs)
     for (let r = 0; r < candidateFamilies.length; r++) {
       const famId = candidateFamilies[r];
       const famille = familiesToInclude.find(f => f.famille_id === famId);
@@ -650,14 +662,24 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
       if (!famille) continue;
       
       const assignedSoFar = famille.current_assignments;
-      const over = assignedSoFar - idealToDate;
+      // Équité par famille: objectif proportionnel à nb_nettoyage
+      const idealToDateForFamily = (famille.nb_nettoyage || 0) * fractionSoFar;
+      const over = assignedSoFar - idealToDateForFamily;
       const timeScore = Math.max(0, over);
       const timeCost = Math.round(ALPHA * timeScore);
 
       for (let c = 0; c < S; c++) {
         const clsId = availableClasses[c].id;
         if (!candidatesPerSlot[c].includes(famId)) continue;
-        matrix[r][c] = timeCost; // Coût basé sur l'équité temporelle
+        // Coût basé sur l'équité temporelle + préférence souple
+        let cost = timeCost;
+        const isCommon = commonClasses.has(clsId);
+        const hasPrefs = (famille.classes_pref && famille.classes_pref.size > 0);
+        const inPrefs = hasPrefs && famille.classes_pref.has(clsId);
+        if (!isCommon && hasPrefs && !inPrefs) {
+          cost += PREFERENCE_PENALTY;
+        }
+        matrix[r][c] = cost;
       }
     }
 
@@ -931,19 +953,21 @@ export const updateScheduledSMSLastExecuted = async (smsId) => {
 
 export const getScheduledSMSToExecute = async () => {
   try {
-    // Obtenir l'heure actuelle en fuseau horaire de Bruxelles
-    const nowInBrussels = new Date().toLocaleString("en-US", {timeZone: "Europe/Brussels"});
-    const brusselsTime = new Date(nowInBrussels);
+    // Obtenir l'heure actuelle en UTC et en fuseau horaire de Bruxelles
+    const nowUTC = new Date();
     
-    const currentDayOfWeek = brusselsTime.getDay(); // 0=Dimanche, 1=Lundi, etc.
-    const currentHour = brusselsTime.getHours();
-    const currentMinute = brusselsTime.getMinutes();
+    // Créer une date pour le fuseau horaire de Bruxelles
+    const nowBrussels = new Date(nowUTC.toLocaleString("en-US", {timeZone: "Europe/Brussels"}));
     
-    console.log(`🕐 Vérification SMS planifiés - Heure Bruxelles: ${brusselsTime.toLocaleString('fr-BE')} (Jour: ${currentDayOfWeek}, H: ${currentHour}, M: ${currentMinute})`);
+    const currentDayOfWeek = nowBrussels.getDay(); // 0=Dimanche, 1=Lundi, etc.
+    const currentHour = nowBrussels.getHours();
+    const currentMinute = nowBrussels.getMinutes();
+    
+    console.log(`🕐 Vérification SMS planifiés - UTC: ${nowUTC.toISOString()}, Bruxelles: ${nowBrussels.toLocaleString('fr-BE')} (Jour: ${currentDayOfWeek}, H: ${currentHour}, M: ${currentMinute})`);
     
     // Fonction pour calculer la dernière occurrence d'une date/heure planifiée dans les dernières 24h
     const getLastScheduledOccurrenceIn24h = (dayOfWeek, hour, minute) => {
-      const now = new Date(brusselsTime);
+      const now = new Date(nowUTC);
       const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       
       // Chercher dans les dernières 24h seulement
@@ -952,8 +976,10 @@ export const getScheduledSMSToExecute = async () => {
         checkDate.setDate(now.getDate() - daysBack);
         
         if (checkDate.getDay() === dayOfWeek) {
-          // C'est le bon jour de la semaine
-          checkDate.setHours(hour, minute, 0, 0);
+          // C'est le bon jour de la semaine - CALCULER EN UTC DIRECTEMENT
+          // Convertir l'heure de Bruxelles vers UTC (CEST = UTC+2, CET = UTC+1)
+          const offsetHours = checkDate.getTimezoneOffset() === -120 ? 2 : 1; // -120 = CEST, -60 = CET
+          checkDate.setUTCHours(hour - offsetHours, minute, 0, 0);
           
           // Si cette occurrence est dans les dernières 24h ET avant maintenant
           // MAIS pas dans la fenêtre actuelle de "programmé maintenant" (pour éviter les doublons)
@@ -964,7 +990,7 @@ export const getScheduledSMSToExecute = async () => {
             minute <= currentMinute
           );
           
-          if (checkDate >= twentyFourHoursAgo && checkDate < now && !isCurrentScheduleWindow) {
+          if (checkDate >= twentyFourHoursAgo && checkDate < nowUTC && !isCurrentScheduleWindow) {
             return checkDate;
           }
         }
@@ -1009,9 +1035,14 @@ export const getScheduledSMSToExecute = async () => {
       // Vérifier si le SMS doit être envoyé :
       // 1. Jamais envoyé (last_executed_date IS NULL)
       // 2. Dernière exécution antérieure à la dernière occurrence planifiée
+      // NOTE: lastScheduledOccurrence est maintenant calculée directement en UTC
+      const lastExecutedDateUTC = new Date(sms.last_executed_date);
+      
+      console.log(`   🔍 Debug "${sms.name}": lastExecuted(UTC)=${lastExecutedDateUTC.toISOString()}, lastOccurrence(UTC)=${lastScheduledOccurrence.toISOString()}`);
+      
       const shouldExecute = (
         !sms.last_executed_date || 
-        new Date(sms.last_executed_date) < lastScheduledOccurrence
+        lastExecutedDateUTC < lastScheduledOccurrence
       );
       
       if (shouldExecute) {

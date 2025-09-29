@@ -160,23 +160,53 @@ function createSMSServiceForCron() {
 }
 
 /**
- * Normaliser un numéro de téléphone (pour Twilio - format E.164)
+ * Normaliser un numéro de téléphone avec support européen (format E.164)
  */
 function normalizePhoneNumber(phone) {
   if (!phone) throw new Error('Numéro de téléphone manquant');
   
   let cleaned = phone.replace(/[^\d+]/g, '');
   
+  // Si déjà au format E.164 avec +
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  
+  // Indicatifs européens courants avec longueurs valides
+  const europeanCountryCodes = [
+    { code: '32', length: [9] },      // Belgique
+    { code: '33', length: [9] },      // France  
+    { code: '49', length: [10, 11, 12] }, // Allemagne
+    { code: '31', length: [9] },      // Pays-Bas
+    { code: '41', length: [9] },      // Suisse
+    { code: '43', length: [10, 11] }, // Autriche
+    { code: '39', length: [9, 10] },  // Italie
+    { code: '34', length: [9] },      // Espagne
+    { code: '44', length: [10] },     // Royaume-Uni
+    { code: '351', length: [9] },     // Portugal
+    { code: '352', length: [8, 9] },  // Luxembourg
+  ];
+  
+  // Vérifier si c'est un indicatif européen direct
+  for (const country of europeanCountryCodes) {
+    if (cleaned.startsWith(country.code)) {
+      const remainingDigits = cleaned.substring(country.code.length);
+      if (country.length.includes(remainingDigits.length)) {
+        return '+' + cleaned;
+      }
+    }
+  }
+  
   if (cleaned.startsWith('0032')) {
     cleaned = '+32' + cleaned.substring(4);
   } else if (cleaned.startsWith('00')) {
     cleaned = '+' + cleaned.substring(2);
-  } else if (!cleaned.startsWith('+')) {
-    if (cleaned.startsWith('0')) {
-      cleaned = '+32' + cleaned.substring(1);
-    } else {
-      cleaned = '+32' + cleaned;
-    }
+  } else if (cleaned.startsWith('0')) {
+    cleaned = '+32' + cleaned.substring(1);
+  } else if (cleaned.length === 9) {
+    cleaned = '+32' + cleaned;
+  } else {
+    cleaned = '+32' + cleaned;
   }
   
   return cleaned;
