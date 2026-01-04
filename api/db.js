@@ -503,7 +503,8 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
       occupiedFamiliesRes,
       assignedCountsRes,
       weeksRes,
-      classesCountRes
+      classesCountRes,
+      lastAssignmentRes
     ] = await Promise.all([
       query('SELECT id, debut, fin FROM semaines WHERE id = $1 AND planning_id = $2', [semaineId, planningId]),
       query('SELECT id, nom, ordre, description FROM classes WHERE planning_id = $1 ORDER BY ordre, id', [planningId]),
@@ -520,7 +521,15 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
         GROUP BY a.famille_id
       `, [planningId, semaineId]),
       query('SELECT id, debut FROM semaines WHERE planning_id = $1 ORDER BY debut', [planningId]),
-      query('SELECT COUNT(*) AS c FROM classes WHERE planning_id = $1', [planningId])
+      query('SELECT COUNT(*) AS c FROM classes WHERE planning_id = $1', [planningId]),
+      // Dernière semaine d'affectation pour chaque famille (pour éviter les clusters)
+      query(`
+        SELECT a.famille_id, MAX(s.debut) AS last_assignment_date
+        FROM affectations a
+        JOIN semaines s ON a.semaine_id = s.id
+        WHERE a.planning_id = $1 AND s.debut < (SELECT debut FROM semaines WHERE id = $2)
+        GROUP BY a.famille_id
+      `, [planningId, semaineId])
     ]);
 
     if (semaineRes.rows.length === 0) {
@@ -552,6 +561,11 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
     const occupiedClasses = new Set(occupiedClassesRes.rows.map(r => r.classe_id));
     const occupiedFamilies = new Set(occupiedFamiliesRes.rows.map(r => Number(r.famille_id)));
     const assignedMap = new Map(assignedCountsRes.rows.map(r => [Number(r.famille_id), Number(r.c)]));
+    
+    // Map pour stocker la dernière date d'affectation par famille
+    const lastAssignmentMap = new Map(
+      lastAssignmentRes.rows.map(r => [Number(r.famille_id), new Date(r.last_assignment_date)])
+    );
 
     const totalWeeks = weeksRes.rows.length;
     const classesCount = Number(classesCountRes.rows[0]?.c || 0);
@@ -572,24 +586,14 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
         nom: r.nom,
         nb_nettoyage: r.nb_nettoyage,
         classes_pref: new Set((r.classes_preferences || []).map(id => id.toString())),
-        current_assignments: assignedMap.get(Number(r.famille_id)) || 0
+        current_assignments: assignedMap.get(Number(r.famille_id)) || 0,
+        last_assignment_date: lastAssignmentMap.get(Number(r.famille_id)) || null
       }));
 
     // 2. Classes disponibles pour cette semaine
     const availableClasses = classes
       .map(r => ({ id: r.id.toString(), nom: r.nom, description: r.description || '' }))
       .filter(c => !occupiedClasses.has(c.id));
-
-    // Détection des "espaces communs" (préférences universelles)
-    const commonClasses = new Set(
-      availableClasses
-        .filter(c => {
-          const n = (c.nom || '').toLowerCase();
-          const d = (c.description || '').toLowerCase();
-          return n.includes('commun') || n.includes('espace') || d.includes('commun') || d.includes('espace');
-        })
-        .map(c => c.id)
-    );
 
     if (availableClasses.length === 0) {
       return {
@@ -653,8 +657,13 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
     const famIndex = new Map(candidateFamilies.map((id, i) => [id, i]));
     const matrix = Array.from({ length: n }, () => Array(n).fill(LARGE_COST));
 
-    // Remplissage de la matrice avec les coûts d'équité temporelle + pénalité de préférence
-    const PREFERENCE_PENALTY = 10; // pénalité si la classe n'est pas dans les préférences (hors espaces communs)
+    // Remplissage de la matrice avec les coûts d'équité temporelle + pénalités
+    const PREFERENCE_PENALTY = 5;   // pénalité si la classe n'est pas dans les préférences
+    const RECENCY_PENALTY = 50;      // pénalité si le dernier nettoyage est trop proche
+    const RECENCY_THRESHOLD_WEEKS = 4; // seuil en semaines pour la pénalité de proximité
+    
+    const currentWeekDate = new Date(semaine.debut);
+    
     for (let r = 0; r < candidateFamilies.length; r++) {
       const famId = candidateFamilies[r];
       const famille = familiesToInclude.find(f => f.famille_id === famId);
@@ -665,18 +674,29 @@ export const autoDistributeWeek = async (semaineId, planningId) => {
       // Équité par famille: objectif proportionnel à nb_nettoyage
       const idealToDateForFamily = (famille.nb_nettoyage || 0) * fractionSoFar;
       const over = assignedSoFar - idealToDateForFamily;
-      const timeScore = Math.max(0, over);
-      const timeCost = Math.round(ALPHA * timeScore);
+      // Permettre des coûts négatifs pour prioriser les familles en retard
+      let timeCost = Math.round(ALPHA * over);
+      
+      // Pénalité de proximité : éviter les assignations trop rapprochées
+      if (famille.last_assignment_date) {
+        const daysSinceLastAssignment = (currentWeekDate - famille.last_assignment_date) / (1000 * 60 * 60 * 24);
+        const weeksSinceLastAssignment = daysSinceLastAssignment / 7;
+        
+        if (weeksSinceLastAssignment < RECENCY_THRESHOLD_WEEKS) {
+          // Plus c'est récent, plus la pénalité est forte
+          const recencyFactor = 1 - (weeksSinceLastAssignment / RECENCY_THRESHOLD_WEEKS);
+          timeCost += Math.round(RECENCY_PENALTY * recencyFactor);
+        }
+      }
 
       for (let c = 0; c < S; c++) {
         const clsId = availableClasses[c].id;
         if (!candidatesPerSlot[c].includes(famId)) continue;
         // Coût basé sur l'équité temporelle + préférence souple
         let cost = timeCost;
-        const isCommon = commonClasses.has(clsId);
         const hasPrefs = (famille.classes_pref && famille.classes_pref.size > 0);
         const inPrefs = hasPrefs && famille.classes_pref.has(clsId);
-        if (!isCommon && hasPrefs && !inPrefs) {
+        if (hasPrefs && !inPrefs) {
           cost += PREFERENCE_PENALTY;
         }
         matrix[r][c] = cost;
