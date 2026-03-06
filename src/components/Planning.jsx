@@ -185,6 +185,16 @@ export function Planning() {
 
 
 
+  // Auto-scroll vers la semaine courante au chargement initial
+  const hasAutoScrolled = useRef(false);
+  useEffect(() => {
+    if (!loading && data.semaines?.length > 0 && !hasAutoScrolled.current) {
+      hasAutoScrolled.current = true;
+      // Petit délai pour que le DOM soit prêt
+      setTimeout(scrollToCurrentWeek, 300);
+    }
+  }, [loading, data.semaines]);
+
   // Mettre à jour les flèches quand la sidebar change
   useEffect(() => {
     const timer = setTimeout(() => {
