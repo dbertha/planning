@@ -3,31 +3,49 @@
 /**
  * Script de conversion des données de l'école au format CSV pour import
  * 
- * Usage: node convert_school_data.js
+ * Usage: node convert_school_data.js [--new-only]
+ * 
+ * Options:
+ *   --new-only  Ne génère que les nouvelles familles (non présentes dans familles_import.csv existant)
  * 
  * Génère:
  * - classes_import.csv : Classes/zones de nettoyage
- * - familles_import.csv : Familles avec préférences
+ * - familles_import.csv : Familles avec préférences (ou familles_new.csv avec --new-only)
  */
 
 import fs from 'fs';
 import path from 'path';
 
 // Mapping des titulaires vers les IDs de zones de nettoyage
+// Supporte les formats "Prénom" (ancien) et "Nom Prénom" (nouveau)
 const TITULAIRE_TO_ZONE = {
+  // Ancien format (prénom seul)
   'Stéphanie': 'A',  // M1/M2 -> Partie A (Canard + Grenouille)
-  'Eglantine': 'B',  // M1 -> Partie B (Chat + Cuisine Cheval)
-  'Béatrice': 'G',   // M2/M3 -> Partie G (Libellule + Cheval)
+  'Eglantine': 'B',  // M1 -> Partie B (Chat + Ecureuil/Cuisine)
+  'Béatrice': 'D',   // M2/M3 -> Partie D (Libellule + Cheval)
   'Candice': 'C',    // M2/M3 -> Partie C (Poule + Poisson)
   'Camille': 'E',    // P1 -> Partie E (Papillon + Vache)
   'Clémentine': 'F', // P2 -> Partie F (Chien + Lapin)
-  'Gjevrie': 'D',    // P3 -> Partie D (Hirondelle + Milan)
-  'Aveline': 'D',    // P4 -> Partie D (Hirondelle + Milan)
+  'Gjevrie': 'G',    // P3 -> Partie G (Hirondelle + Milan)
+  'Aveline': 'G',    // P4 -> Partie G (Hirondelle + Milan)
   'Anne': 'E',       // P5 -> Partie E (Papillon + Vache)
-  'Anaëlle': 'F'     // P6 -> Partie F (Chien + Lapin)
+  'Anaëlle': 'F',    // P6 -> Partie F (Chien + Lapin)
+  // Nouveau format (nom prénom) - 2025-2026
+  'Gallez Stéphanie': 'A',
+  'Populaire Eglantine': 'B',
+  'Hallez Béatrice': 'D',
+  'Flaba Candice': 'C',
+  'Albert Camille': 'E',
+  'Lengelé Clémentine': 'F',
+  'Ahmedi Gjevrie': 'G',
+  'Crespeigne Aveline': 'G',
+  'Baral Anne': 'E',
+  'Simon Anaëlle': 'F',
+  'Vancollie Fanny': 'D' // Ajout potentiel si besoin
 };
 
 // Définition des zones de nettoyage
+// ABCD = Maternelles, EFG = Primaires (réorganisé mars 2026)
 const ZONES_NETTOYAGE = [
   {
     id: 'A',
@@ -37,46 +55,46 @@ const ZONES_NETTOYAGE = [
     description: 'Local Canard (Classe de Stéphanie) + local Grenouille (Salle de Taï-Chi au grenier)'
   },
   {
-    id: 'B', 
+    id: 'B',
     nom: 'Partie B - Maternelle',
     couleur: '#ffdfba',
     ordre: 2,
-    description: 'Local Chat (Classe d\'Eglantine) + espace Cuisine du local Cheval (grenier)'
+    description: 'Local Chat (Classe d\'Eglantine) + local Ecureuil (cuisine uniquement)'
   },
   {
     id: 'C',
-    nom: 'Partie C - Maternelle', 
+    nom: 'Partie C - Maternelle',
     couleur: '#ffffba',
     ordre: 3,
     description: 'Local Poule (Classe de Candice) + local Poisson (local sieste des marmottes)'
   },
   {
-    id: 'G',
-    nom: 'Partie G - Maternelle',
+    id: 'D',
+    nom: 'Partie D - Maternelle',
     couleur: '#baffba',
     ordre: 4,
-    description: 'Local Libellule (Classe de Béatrice) + local Cheval (grenier) = uniquement espace devant le local Écureuil (salle des profs), plancher et scène compris'
-  },
-  {
-    id: 'D',
-    nom: 'Partie D - Primaire',
-    couleur: '#baffc9',
-    ordre: 5,
-    description: 'Local Hirondelle (Classe de P3) + local Milan (classe de P4)'
+    description: 'Local Libellule (Classe de Béatrice) + local Cheval (estrade + parquet + garderie)'
   },
   {
     id: 'E',
     nom: 'Partie E - Primaire',
     couleur: '#bae1ff',
-    ordre: 6,
+    ordre: 5,
     description: 'Local Papillon (Classe de P1) + local Vache (Classe de P5)'
   },
   {
     id: 'F',
     nom: 'Partie F - Primaire',
     couleur: '#c9baff',
-    ordre: 7,
+    ordre: 6,
     description: 'Local Chien (Classe de P6) + local Lapin (Classe de P2)'
+  },
+  {
+    id: 'G',
+    nom: 'Partie G - Primaire',
+    couleur: '#ffb3d9',
+    ordre: 7,
+    description: 'Local Hirondelle (Classe de P3) + local Milan (classe de P4)'
   }
 ];
 
@@ -135,7 +153,7 @@ function parseCSVLine(line, delimiter = ',') {
 }
 
 /**
- * Normalise numéro de téléphone belge
+ * Normalise numéro de téléphone européen
  */
 function normalizePhoneNumber(phone) {
   if (!phone) return '';
@@ -143,22 +161,59 @@ function normalizePhoneNumber(phone) {
   // Nettoyer le numéro
   let cleaned = phone.replace(/[^\d+]/g, '');
   
-  // Si commence par 32, c'est déjà au format international
-  if (cleaned.startsWith('32')) {
-    return '+' + cleaned;
+  // Si déjà au format international avec +
+  if (cleaned.startsWith('+')) {
+    return cleaned;
   }
   
-  // Si commence par 0, remplacer par +32
+  // Indicatifs européens courants
+  const europeanCountryCodes = [
+    { code: '32', length: [9] },      // Belgique: 9 chiffres après indicatif
+    { code: '33', length: [9] },      // France: 9 chiffres après indicatif  
+    { code: '49', length: [10, 11, 12] }, // Allemagne: 10-12 chiffres après indicatif
+    { code: '31', length: [9] },      // Pays-Bas
+    { code: '41', length: [9] },      // Suisse
+    { code: '43', length: [10, 11] }, // Autriche
+    { code: '39', length: [9, 10] },  // Italie
+    { code: '34', length: [9] },      // Espagne
+    { code: '44', length: [10] },     // Royaume-Uni
+    { code: '351', length: [9] },     // Portugal
+    { code: '352', length: [8, 9] },  // Luxembourg
+  ];
+  
+  // Vérifier si c'est un indicatif européen direct
+  for (const country of europeanCountryCodes) {
+    if (cleaned.startsWith(country.code)) {
+      const remainingDigits = cleaned.substring(country.code.length);
+      if (country.length.includes(remainingDigits.length)) {
+        return '+' + cleaned;
+      }
+    }
+  }
+  
+  // Si commence par 0032, remplacer par +32
+  if (cleaned.startsWith('0032')) {
+    return '+32' + cleaned.substring(4);
+  }
+  
+  // Si commence par 00, remplacer par +
+  if (cleaned.startsWith('00')) {
+    return '+' + cleaned.substring(2);
+  }
+  
+  // Si commence par 0, c'est probablement un numéro belge national
   if (cleaned.startsWith('0')) {
     return '+32' + cleaned.substring(1);
   }
   
-  // Si pas de préfixe, ajouter +32
+  // Si 9 chiffres sans préfixe, supposer belge
   if (cleaned.length === 9) {
     return '+32' + cleaned;
   }
   
-  return phone; // Retourner tel quel si format non reconnu
+  // Pour les autres cas, retourner tel quel avec avertissement
+  console.warn(`Format de téléphone non reconnu: ${phone} - retourné tel quel`);
+  return phone;
 }
 
 /**
@@ -348,28 +403,126 @@ function generateFamillesCSV() {
 }
 
 /**
+ * Extrait les noms de familles existants depuis un fichier CSV
+ */
+function getExistingFamilyNames(csvPath) {
+  if (!fs.existsSync(csvPath)) {
+    return new Set();
+  }
+  
+  const content = fs.readFileSync(csvPath, 'utf-8');
+  const lines = content.trim().split(/\r?\n/);
+  
+  if (lines.length <= 1) {
+    return new Set();
+  }
+  
+  const names = new Set();
+  
+  // Parcourir les lignes (en sautant l'en-tête)
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i], ',');
+    if (values.length > 0) {
+      // Le nom est la première colonne, enlever les guillemets
+      const nom = values[0].replace(/^"|"$/g, '').trim();
+      if (nom) {
+        names.add(nom.toLowerCase()); // Comparaison insensible à la casse
+      }
+    }
+  }
+  
+  return names;
+}
+
+/**
+ * Filtre les lignes CSV pour ne garder que les nouvelles familles
+ */
+function filterNewFamilies(csvContent, existingNames) {
+  const lines = csvContent.trim().split('\n');
+  const header = lines[0];
+  
+  const newLines = [header];
+  let newCount = 0;
+  
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i], ',');
+    if (values.length > 0) {
+      const nom = values[0].replace(/^"|"$/g, '').trim().toLowerCase();
+      if (!existingNames.has(nom)) {
+        newLines.push(lines[i]);
+        newCount++;
+      }
+    }
+  }
+  
+  return { csv: newLines.join('\n'), count: newCount };
+}
+
+/**
  * Main function
  */
 function main() {
+  const args = process.argv.slice(2);
+  const newOnlyMode = args.includes('--new-only');
+  
   try {
     console.log('🔄 Conversion des données de l\'école...\n');
     
-    // Générer CSV des classes
-    console.log('📋 Génération du fichier classes...');
-    const classesCSV = generateClassesCSV();
-    fs.writeFileSync('classes_import.csv', classesCSV, 'utf-8');
-    console.log('✅ classes_import.csv généré');
-    console.log(`   → ${ZONES_NETTOYAGE.length} zones de nettoyage\n`);
+    if (newOnlyMode) {
+      console.log('📌 Mode --new-only activé: seules les nouvelles familles seront générées\n');
+    }
+    
+    // Générer CSV des classes (seulement en mode normal)
+    if (!newOnlyMode) {
+      console.log('📋 Génération du fichier classes...');
+      const classesCSV = generateClassesCSV();
+      fs.writeFileSync('classes_import.csv', classesCSV, 'utf-8');
+      console.log('✅ classes_import.csv généré');
+      console.log(`   → ${ZONES_NETTOYAGE.length} zones de nettoyage\n`);
+    }
     
     // Générer CSV des familles
     console.log('👨‍👩‍👧‍👦 Génération du fichier familles...');
     const famillesCSV = generateFamillesCSV();
-    fs.writeFileSync('familles_import.csv', famillesCSV, 'utf-8');
     
-    // Compter les lignes générées
-    const famillesLines = famillesCSV.split('\n').length - 1; // -1 pour header
-    console.log('✅ familles_import.csv généré');
-    console.log(`   → ${famillesLines} familles actives`);
+    if (newOnlyMode) {
+      // Charger les familles existantes
+      const existingPath = 'familles_import.csv';
+      const existingNames = getExistingFamilyNames(existingPath);
+      console.log(`   📂 ${existingNames.size} familles existantes dans ${existingPath}`);
+      
+      // Filtrer pour ne garder que les nouvelles
+      const { csv: newFamillesCSV, count: newCount } = filterNewFamilies(famillesCSV, existingNames);
+      
+      if (newCount === 0) {
+        console.log('\n✅ Aucune nouvelle famille trouvée!');
+        console.log('   Toutes les familles sont déjà présentes dans familles_import.csv');
+      } else {
+        fs.writeFileSync('familles_new.csv', newFamillesCSV, 'utf-8');
+        console.log(`✅ familles_new.csv généré`);
+        console.log(`   → ${newCount} nouvelles familles`);
+        
+        // Afficher les nouvelles familles
+        console.log('\n🆕 Nouvelles familles détectées:');
+        const newLines = newFamillesCSV.split('\n').slice(1);
+        newLines.forEach(line => {
+          const values = parseCSVLine(line, ',');
+          if (values.length > 0) {
+            const nom = values[0].replace(/^"|"$/g, '');
+            const prefs = values[5]?.replace(/^"|"$/g, '') || '';
+            console.log(`   - ${nom} (zones: ${prefs})`);
+          }
+        });
+      }
+    } else {
+      fs.writeFileSync('familles_import.csv', famillesCSV, 'utf-8');
+      
+      // Compter les lignes générées
+      const famillesLines = famillesCSV.split('\n').length - 1; // -1 pour header
+      console.log('✅ familles_import.csv généré');
+      console.log(`   → ${famillesLines} familles actives`);
+    }
+    
     console.log(`   → ${FAMILLES_EXCLUES.length} familles exclues\n`);
     
     // Afficher zones et leurs mappings
@@ -386,9 +539,14 @@ function main() {
     
     console.log('\n✨ Conversion terminée!');
     console.log('📁 Fichiers générés:');
-    console.log('   - classes_import.csv');
-    console.log('   - familles_import.csv');
-    console.log('\nVous pouvez maintenant importer ces fichiers dans le système de planning.');
+    if (!newOnlyMode) {
+      console.log('   - classes_import.csv');
+      console.log('   - familles_import.csv');
+      console.log('\nVous pouvez maintenant importer ces fichiers dans le système de planning.');
+    } else {
+      console.log('   - familles_new.csv (nouvelles familles uniquement)');
+      console.log('\nVous pouvez ajouter manuellement ces familles ou fusionner avec familles_import.csv.');
+    }
     
   } catch (error) {
     console.error('❌ Erreur lors de la conversion:', error.message);
